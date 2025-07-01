@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "FlexFloor"
 include(":app")
- 
+include(":flexfloorlib")
