@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- 标题文本 -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/floor_title_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        android:textColor="@color/on_surface"
+        tools:text="这是楼层标题" />
+
+    <!-- 内容文本 -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/floor_content_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="@color/on_surface_variant"
+        tools:text="这是楼层的详细内容，可以包含多行文本和详细的描述信息。" />
+
+</LinearLayout> 

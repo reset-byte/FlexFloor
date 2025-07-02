@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/banner_container"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- 横幅标题（可选） -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/banner_title_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp"
+        android:textAppearance="?attr/textAppearanceTitleMedium"
+        android:textColor="@color/on_surface"
+        android:visibility="gone"
+        tools:text="横幅标题"
+        tools:visibility="visible" />
+
+    <!-- 横幅图片 -->
+    <ImageView
+        android:id="@+id/banner_image_view"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:background="@color/surface_variant"
+        android:contentDescription="横幅图片"
+        android:scaleType="centerCrop"
+        android:src="@android:drawable/ic_menu_slideshow"
+        tools:src="@android:drawable/ic_menu_slideshow" />
+
+</LinearLayout> 

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- 图片显示区域 -->
+    <ImageView
+        android:id="@+id/floor_image_view"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_marginBottom="12dp"
+        android:background="@color/surface_variant"
+        android:contentDescription="楼层图片"
+        android:scaleType="centerCrop"
+        android:src="@android:drawable/ic_menu_gallery" />
+
+    <!-- 标题文本 -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/floor_title_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        android:textColor="@color/on_surface"
+        tools:text="图片楼层标题" />
+
+    <!-- 描述文本 -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/floor_description_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="@color/on_surface_variant"
+        tools:text="这是图片楼层的描述信息，可以包含更多详细内容。" />
+
+</LinearLayout> 
