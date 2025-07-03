@@ -1,43 +1,57 @@
 package com.github.flexfloor.floors
 
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.widget.TextView
-import androidx.recyclerview.widget.RecyclerView
-import com.github.flexfloorlib.base.BaseFloor
-import com.github.flexfloorlib.model.FloorData
+import com.github.flexfloorlib.core.BaseFloor
 import com.github.flexfloorlib.model.FloorType
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 
 /**
- * 文本楼层实现
- * 用于显示文本内容的楼层
+ * 重构后的文本楼层实现
+ * 使用新的架构：职责分离，统一数据处理
  */
-class TextFloor : BaseFloor() {
+class TextFloor : BaseFloor<TextFloorData>() {
     
     override fun getFloorType(): String = FloorType.TEXT.typeName
     
-    override fun onCreateView(parent: ViewGroup): View {
-        return LayoutInflater.from(parent.context).inflate(
-            com.github.flexfloor.R.layout.floor_text,
-            parent,
-            false
-        )
+    override fun getLayoutResId(): Int = com.github.flexfloor.R.layout.floor_text
+    
+    /**
+     * 解析业务数据 - 统一数据解析入口
+     */
+    override fun parseBusinessData(configData: Map<String, Any>): TextFloorData? {
+        return try {
+            val gson = Gson()
+            val json = gson.toJson(configData)
+            gson.fromJson(json, TextFloorData::class.java)
+        } catch (e: Exception) {
+            // 解析失败时使用默认数据
+            TextFloorData(
+                title = configData["title"] as? String,
+                content = configData["content"] as? String,
+                titleColor = configData["title_color"] as? String,
+                contentColor = configData["content_color"] as? String,
+                titleSize = (configData["title_size"] as? Number)?.toFloat(),
+                contentSize = (configData["content_size"] as? Number)?.toFloat(),
+                maxLines = (configData["max_lines"] as? Number)?.toInt()
+            )
+        }
     }
     
-    override fun onBindData(holder: RecyclerView.ViewHolder, floorData: FloorData, position: Int) {
-        val textData: TextFloorData = parseTextData(floorData.data)
+    /**
+     * 渲染视图 - 纯视图渲染逻辑
+     */
+    override fun renderView(view: View, data: TextFloorData, position: Int) {
+        val titleView: TextView = view.findViewById(com.github.flexfloor.R.id.floor_title_text)
+        val contentView: TextView = view.findViewById(com.github.flexfloor.R.id.floor_content_text)
         
-        val titleView: TextView = holder.itemView.findViewById(com.github.flexfloor.R.id.floor_title_text)
-        val contentView: TextView = holder.itemView.findViewById(com.github.flexfloor.R.id.floor_content_text)
-        
-        titleView.text = textData.title ?: floorData.title ?: ""
-        contentView.text = textData.content ?: ""
+        // 设置文本内容
+        titleView.text = data.title ?: ""
+        contentView.text = data.content ?: ""
         
         // 设置文本样式
-        textData.titleColor?.let { color ->
+        data.titleColor?.let { color ->
             try {
                 titleView.setTextColor(android.graphics.Color.parseColor(color))
             } catch (e: IllegalArgumentException) {
@@ -45,7 +59,7 @@ class TextFloor : BaseFloor() {
             }
         }
         
-        textData.contentColor?.let { color ->
+        data.contentColor?.let { color ->
             try {
                 contentView.setTextColor(android.graphics.Color.parseColor(color))
             } catch (e: IllegalArgumentException) {
@@ -53,41 +67,60 @@ class TextFloor : BaseFloor() {
             }
         }
         
-        textData.titleSize?.let { size ->
+        data.titleSize?.let { size ->
             titleView.textSize = size
         }
         
-        textData.contentSize?.let { size ->
+        data.contentSize?.let { size ->
             contentView.textSize = size
         }
         
+        // 设置最大行数
+        data.maxLines?.let { maxLines ->
+            contentView.maxLines = maxLines
+        }
+        
         // 设置可见性
-        titleView.visibility = if (textData.title.isNullOrEmpty()) View.GONE else View.VISIBLE
-        contentView.visibility = if (textData.content.isNullOrEmpty()) View.GONE else View.VISIBLE
+        titleView.visibility = if (data.title.isNullOrEmpty()) View.GONE else View.VISIBLE
+        contentView.visibility = if (data.content.isNullOrEmpty()) View.GONE else View.VISIBLE
+        
+        // 设置点击事件
+        view.setOnClickListener { onFloorClick(it) }
     }
     
-    override fun isSupportLazyLoad(): Boolean = false
-    
-    override fun getPriority(): Int = 1
+    /**
+     * 异步加载数据 - 可选的远程数据加载
+     */
+    override suspend fun loadData(): TextFloorData? {
+        // 这里可以实现远程数据加载逻辑
+        // 例如：从API获取更详细的文本内容
+        return null // 当前示例中不需要异步加载
+    }
     
     /**
-     * 解析文本数据
+     * 自定义加载状态显示
      */
-    private fun parseTextData(data: Any?): TextFloorData {
-        return try {
-            when (data) {
-                is TextFloorData -> data
-                is String -> Gson().fromJson(data, TextFloorData::class.java)
-                is Map<*, *> -> {
-                    val gson = Gson()
-                    val json = gson.toJson(data)
-                    gson.fromJson(json, TextFloorData::class.java)
-                }
-                else -> TextFloorData()
-            }
-        } catch (e: Exception) {
-            TextFloorData()
-        }
+    override fun showLoadingState(view: View) {
+        val titleView: TextView = view.findViewById(com.github.flexfloor.R.id.floor_title_text)
+        val contentView: TextView = view.findViewById(com.github.flexfloor.R.id.floor_content_text)
+        
+        titleView.text = "加载中..."
+        contentView.text = "正在获取内容..."
+        titleView.visibility = View.VISIBLE
+        contentView.visibility = View.VISIBLE
+    }
+    
+    /**
+     * 自定义错误状态显示
+     */
+    override fun showErrorState(view: View, error: String) {
+        val titleView: TextView = view.findViewById(com.github.flexfloor.R.id.floor_title_text)
+        val contentView: TextView = view.findViewById(com.github.flexfloor.R.id.floor_content_text)
+        
+        titleView.text = "加载失败"
+        contentView.text = error
+        titleView.visibility = View.VISIBLE
+        contentView.visibility = View.VISIBLE
     }
 }
 

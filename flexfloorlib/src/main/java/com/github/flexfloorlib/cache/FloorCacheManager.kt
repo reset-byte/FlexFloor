@@ -1,20 +1,19 @@
 package com.github.flexfloorlib.cache
 
 import android.content.Context
-import android.util.LruCache
+import com.github.flexfloorlib.model.CachePolicy
 import com.github.flexfloorlib.model.FloorData
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileReader
-import java.io.FileWriter
-import java.io.IOException
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.ObjectInputStream
+import java.io.ObjectOutputStream
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 楼层缓存管理器
- * 提供内存缓存和磁盘缓存功能，支持预加载和异步操作
+ * 楼层数据和配置的缓存管理器
  */
 class FloorCacheManager private constructor(private val context: Context) {
     
@@ -27,270 +26,206 @@ class FloorCacheManager private constructor(private val context: Context) {
                 INSTANCE ?: FloorCacheManager(context.applicationContext).also { INSTANCE = it }
             }
         }
-        
-        private const val CACHE_DIR_NAME = "floor_cache"
-        private const val MEMORY_CACHE_SIZE = 50 // 内存缓存大小
-        private const val DEFAULT_EXPIRE_TIME = 24 * 60 * 60 * 1000L // 默认过期时间：24小时
     }
     
-    private val gson: Gson = Gson()
-    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    // Memory cache
+    private val memoryCache = ConcurrentHashMap<String, Any>()
+    private val memoryCacheTimestamps = ConcurrentHashMap<String, Long>()
     
-    // 内存缓存
-    private val memoryCache: LruCache<String, CacheItem> = LruCache(MEMORY_CACHE_SIZE)
+    // Cache configuration
+    private var maxMemoryCacheSize = 50 // Maximum number of items in memory cache
+    private var memoryTtl = 30 * 60 * 1000L // 30 minutes TTL for memory cache
+    private var diskTtl = 24 * 60 * 60 * 1000L // 24 hours TTL for disk cache
     
-    // 预加载任务映射表
-    private val preloadTaskMap: ConcurrentHashMap<String, Job> = ConcurrentHashMap()
+    // Cache directories
+    private val diskCacheDir by lazy {
+        File(context.cacheDir, "floor_cache").apply {
+            if (!exists()) mkdirs()
+        }
+    }
     
-    // 缓存目录
-    private val cacheDir: File by lazy {
-        File(context.cacheDir, CACHE_DIR_NAME).apply {
-            if (!exists()) {
-                mkdirs()
+    /**
+     * Cache floor data
+     */
+    suspend fun cacheFloorData(key: String, data: Any, policy: CachePolicy = CachePolicy.MEMORY) {
+        when (policy) {
+            CachePolicy.MEMORY -> cacheToMemory(key, data)
+            CachePolicy.DISK -> cacheToDisk(key, data)
+            CachePolicy.BOTH -> {
+                cacheToMemory(key, data)
+                cacheToDisk(key, data)
+            }
+            CachePolicy.NONE -> {
+                // Do nothing
             }
         }
     }
     
     /**
-     * 缓存楼层数据
-     * @param key 缓存键
-     * @param floorList 楼层数据列表
-     * @param expireTime 过期时间（毫秒），0表示不过期
+     * Get cached floor data
      */
-    fun cacheFloorData(key: String, floorList: List<FloorData>, expireTime: Long = DEFAULT_EXPIRE_TIME) {
-        val cacheItem = CacheItem(floorList, System.currentTimeMillis(), expireTime)
-        
-        // 写入内存缓存
-        memoryCache.put(key, cacheItem)
-        
-        // 异步写入磁盘缓存
-        coroutineScope.launch {
-            writeToDisk(key, cacheItem)
-        }
-    }
-    
-    /**
-     * 获取缓存的楼层数据
-     * @param key 缓存键
-     * @return 楼层数据列表，如果缓存不存在或已过期则返回null
-     */
-    suspend fun getCachedFloorData(key: String): List<FloorData>? {
-        return withContext(Dispatchers.IO) {
-            // 先从内存缓存获取
-            var cacheItem: CacheItem? = memoryCache.get(key)
-            
-            // 如果内存缓存没有，从磁盘缓存读取
-            if (cacheItem == null) {
-                cacheItem = readFromDisk(key)
-                cacheItem?.let { memoryCache.put(key, it) }
-            }
-            
-            // 检查是否过期
-            if (cacheItem?.isExpired() == false) {
-                cacheItem.floorList
-            } else {
-                // 缓存过期，清除缓存
-                if (cacheItem != null) {
-                    clearCache(key)
-                }
-                null
-            }
-        }
-    }
-    
-    /**
-     * 同步获取缓存的楼层数据（仅从内存缓存获取）
-     * @param key 缓存键
-     * @return 楼层数据列表，如果缓存不存在或已过期则返回null
-     */
-    fun getCachedFloorDataSync(key: String): List<FloorData>? {
-        val cacheItem: CacheItem? = memoryCache.get(key)
-        return if (cacheItem?.isExpired() == false) {
-            cacheItem.floorList
-        } else {
-            null
-        }
-    }
-    
-    /**
-     * 预加载楼层数据
-     * @param key 缓存键
-     * @param dataLoader 数据加载器
-     * @param expireTime 过期时间
-     */
-    fun preloadFloorData(
-        key: String, 
-        dataLoader: suspend () -> List<FloorData>?, 
-        expireTime: Long = DEFAULT_EXPIRE_TIME
-    ) {
-        // 取消之前的预加载任务
-        preloadTaskMap[key]?.cancel()
-        
-        val job = coroutineScope.launch {
-            try {
-                val floorList: List<FloorData>? = dataLoader()
-                if (floorList != null) {
-                    cacheFloorData(key, floorList, expireTime)
-                }
-            } catch (e: Exception) {
-                // 预加载失败，记录日志但不抛出异常
-                e.printStackTrace()
-            }
-        }
-        
-        preloadTaskMap[key] = job
-    }
-    
-    /**
-     * 清除指定键的缓存
-     * @param key 缓存键
-     */
-    fun clearCache(key: String) {
-        // 清除内存缓存
-        memoryCache.remove(key)
-        
-        // 清除磁盘缓存
-        coroutineScope.launch {
-            val file = File(cacheDir, "$key.cache")
-            if (file.exists()) {
-                file.delete()
-            }
-        }
-        
-        // 取消预加载任务
-        preloadTaskMap[key]?.cancel()
-        preloadTaskMap.remove(key)
-    }
-    
-    /**
-     * 清除所有缓存
-     */
-    fun clearAllCache() {
-        // 清除内存缓存
-        memoryCache.evictAll()
-        
-        // 清除磁盘缓存
-        coroutineScope.launch {
-            cacheDir.listFiles()?.forEach { file ->
-                if (file.name.endsWith(".cache")) {
-                    file.delete()
+    suspend fun getCachedFloorData(key: String, policy: CachePolicy = CachePolicy.MEMORY): Any? {
+        return when (policy) {
+            CachePolicy.MEMORY -> getFromMemory(key)
+            CachePolicy.DISK -> getFromDisk(key)
+            CachePolicy.BOTH -> {
+                getFromMemory(key) ?: getFromDisk(key)?.also { data ->
+                    // Promote to memory cache
+                    cacheToMemory(key, data)
                 }
             }
+            CachePolicy.NONE -> null
+        }
+    }
+    
+    /**
+     * Cache floor configuration
+     */
+    suspend fun cacheFloorConfig(floorId: String, floorData: FloorData) {
+        val key = "config_$floorId"
+        cacheFloorData(key, floorData, floorData.cachePolicy)
+    }
+    
+    /**
+     * Get cached floor configuration
+     */
+    suspend fun getCachedFloorConfig(floorId: String, policy: CachePolicy = CachePolicy.MEMORY): FloorData? {
+        val key = "config_$floorId"
+        return getCachedFloorData(key, policy) as? FloorData
+    }
+    
+    /**
+     * Cache to memory
+     */
+    private fun cacheToMemory(key: String, data: Any) {
+        // Check cache size limit
+        if (memoryCache.size >= maxMemoryCacheSize) {
+            evictOldestMemoryCache()
         }
         
-        // 取消所有预加载任务
-        preloadTaskMap.values.forEach { job ->
-            job.cancel()
+        memoryCache[key] = data
+        memoryCacheTimestamps[key] = System.currentTimeMillis()
+    }
+    
+    /**
+     * Get from memory cache
+     */
+    private fun getFromMemory(key: String): Any? {
+        val timestamp = memoryCacheTimestamps[key] ?: return null
+        val currentTime = System.currentTimeMillis()
+        
+        // Check TTL
+        if (currentTime - timestamp > memoryTtl) {
+            memoryCache.remove(key)
+            memoryCacheTimestamps.remove(key)
+            return null
         }
-        preloadTaskMap.clear()
+        
+        return memoryCache[key]
     }
     
     /**
-     * 获取缓存大小（内存 + 磁盘）
-     * @return 缓存大小信息
+     * Cache to disk
      */
-    suspend fun getCacheSize(): CacheSize {
-        return withContext(Dispatchers.IO) {
-            val memorySize: Int = memoryCache.size()
-            val diskSize: Long = cacheDir.listFiles()?.sumOf { file ->
-                if (file.name.endsWith(".cache")) file.length() else 0L
-            } ?: 0L
-            
-            CacheSize(memorySize, diskSize)
-        }
-    }
-    
-    /**
-     * 检查缓存是否存在且未过期
-     * @param key 缓存键
-     * @return 是否存在有效缓存
-     */
-    fun hasValidCache(key: String): Boolean {
-        val cacheItem: CacheItem? = memoryCache.get(key)
-        return cacheItem?.isExpired() == false
-    }
-    
-    /**
-     * 批量预加载楼层数据
-     * @param preloadMap 预加载映射表，key为缓存键，value为数据加载器
-     */
-    fun batchPreload(preloadMap: Map<String, suspend () -> List<FloorData>?>) {
-        preloadMap.forEach { (key, dataLoader) ->
-            preloadFloorData(key, dataLoader)
-        }
-    }
-    
-    /**
-     * 销毁缓存管理器
-     */
-    fun destroy() {
-        coroutineScope.cancel()
-        memoryCache.evictAll()
-        preloadTaskMap.clear()
-    }
-    
-    /**
-     * 写入磁盘缓存
-     */
-    private fun writeToDisk(key: String, cacheItem: CacheItem) {
+    private suspend fun cacheToDisk(key: String, data: Any) = withContext(Dispatchers.IO) {
         try {
-            val file = File(cacheDir, "$key.cache")
-            FileWriter(file).use { writer ->
-                gson.toJson(cacheItem, writer)
-            }
-        } catch (e: IOException) {
-            e.printStackTrace()
-        }
-    }
-    
-    /**
-     * 从磁盘缓存读取
-     */
-    private fun readFromDisk(key: String): CacheItem? {
-        return try {
-            val file = File(cacheDir, "$key.cache")
-            if (file.exists()) {
-                FileReader(file).use { reader ->
-                    gson.fromJson(reader, CacheItem::class.java)
+            val file = File(diskCacheDir, "${key.hashCode()}.cache")
+            val wrapper = CacheWrapper(data, System.currentTimeMillis())
+            
+            FileOutputStream(file).use { fos ->
+                ObjectOutputStream(fos).use { oos ->
+                    oos.writeObject(wrapper)
                 }
-            } else {
-                null
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            null
         }
     }
-}
-
-/**
- * 缓存项数据类
- */
-private data class CacheItem(
-    val floorList: List<FloorData>,
-    val cacheTime: Long,
-    val expireTime: Long
-) {
+    
     /**
-     * 检查是否过期
+     * Get from disk cache
      */
-    fun isExpired(): Boolean {
-        return if (expireTime == 0L) {
-            false // 永不过期
-        } else {
-            System.currentTimeMillis() - cacheTime > expireTime
+    private suspend fun getFromDisk(key: String): Any? = withContext(Dispatchers.IO) {
+        try {
+            val file = File(diskCacheDir, "${key.hashCode()}.cache")
+            if (!file.exists()) return@withContext null
+            
+            FileInputStream(file).use { fis ->
+                ObjectInputStream(fis).use { ois ->
+                    val wrapper = ois.readObject() as CacheWrapper
+                    val currentTime = System.currentTimeMillis()
+                    
+                    // Check TTL
+                    if (currentTime - wrapper.timestamp > diskTtl) {
+                        file.delete()
+                        return@withContext null
+                    }
+                    
+                    return@withContext wrapper.data
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return@withContext null
         }
     }
-}
-
-/**
- * 缓存大小信息
- */
-data class CacheSize(
-    val memoryCount: Int,
-    val diskSize: Long
-) {
-    fun getDiskSizeInMB(): Double {
-        return diskSize / (1024.0 * 1024.0)
+    
+    /**
+     * Evict oldest memory cache entry
+     */
+    private fun evictOldestMemoryCache() {
+        val oldestEntry = memoryCacheTimestamps.minByOrNull { it.value }
+        oldestEntry?.let { (key, _) ->
+            memoryCache.remove(key)
+            memoryCacheTimestamps.remove(key)
+        }
     }
+    
+    /**
+     * Clear all caches
+     */
+    suspend fun clearAllCaches() {
+        memoryCache.clear()
+        memoryCacheTimestamps.clear()
+        
+        withContext(Dispatchers.IO) {
+            diskCacheDir.listFiles()?.forEach { it.delete() }
+        }
+    }
+    
+    /**
+     * Clear memory cache only
+     */
+    fun clearMemoryCache() {
+        memoryCache.clear()
+        memoryCacheTimestamps.clear()
+    }
+    
+    /**
+     * Clear disk cache only
+     */
+    suspend fun clearDiskCache() = withContext(Dispatchers.IO) {
+        diskCacheDir.listFiles()?.forEach { it.delete() }
+    }
+    
+    /**
+     * Configure cache settings
+     */
+    fun configureCacheSettings(
+        maxMemorySize: Int = 50,
+        memoryTtlMillis: Long = 30 * 60 * 1000L,
+        diskTtlMillis: Long = 24 * 60 * 60 * 1000L
+    ) {
+        this.maxMemoryCacheSize = maxMemorySize
+        this.memoryTtl = memoryTtlMillis
+        this.diskTtl = diskTtlMillis
+    }
+    
+    /**
+     * Cache wrapper for disk storage
+     */
+    private data class CacheWrapper(
+        val data: Any,
+        val timestamp: Long
+    ) : java.io.Serializable
 } 

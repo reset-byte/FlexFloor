@@ -58,6 +58,9 @@ dependencies {
     implementation(libs.androidx.recyclerview)
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.paging.runtime.ktx)
+    
+    // 轮播组件
+    implementation("com.github.zhpanvip:bannerviewpager:3.5.12")
 
     // Navigation组件
     implementation(libs.androidx.navigation.fragment.ktx)

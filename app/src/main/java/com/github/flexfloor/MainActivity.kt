@@ -28,9 +28,6 @@ class MainActivity : ComponentActivity() {
      * 初始化UI组件
      */
     private fun initializeUI() {
-        // 设置Toolbar
-        binding.toolbar.title = "FlexFloor 楼层化框架"
-        
         // 设置版本信息
         binding.versionText.text = "Version 1.0.0"
         
@@ -67,11 +64,9 @@ class MainActivity : ComponentActivity() {
             • 支持多种楼层类型
             • 动态配置和加载
             • 楼层复用和缓存
-            • MVI 架构模式
-            • 完整的生命周期管理
+            • MVVM 架构模式
             
             开发者：FlexFloor Team
-            许可证：Apache 2.0
         """.trimIndent())
         dialogBuilder.setPositiveButton("确定") { dialog, _ ->
             dialog.dismiss()

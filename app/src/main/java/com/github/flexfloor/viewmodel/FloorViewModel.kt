@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.flexfloor.network.FloorApiService
 import com.github.flexfloor.repository.FloorRepository
 import com.github.flexfloorlib.model.FloorData
+import com.github.flexfloorlib.model.ActionType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -84,10 +85,10 @@ class FloorViewModel(
      * 处理楼层点击事件
      */
     fun handleFloorClick(floorData: FloorData, position: Int) {
-        floorData.action?.let { action ->
+        floorData.floorConfig.jumpAction?.let { jumpAction ->
             val navigationEvent = NavigationEvent(
-                actionType = action.actionType?.name ?: "unknown",
-                actionUrl = action.actionUrl
+                actionType = jumpAction.actionType.name,
+                actionUrl = jumpAction.url
             )
             _uiState.value = _uiState.value.copy(navigationEvent = navigationEvent)
         }

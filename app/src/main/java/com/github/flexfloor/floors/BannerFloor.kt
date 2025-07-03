@@ -1,47 +1,91 @@
 package com.github.flexfloor.floors
 
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.recyclerview.widget.RecyclerView
-import com.github.flexfloorlib.base.BaseFloor
-import com.github.flexfloorlib.model.FloorData
+import com.github.flexfloor.R
+import com.github.flexfloor.adapter.BannerPageAdapter
+import com.github.flexfloorlib.core.BaseFloor
 import com.github.flexfloorlib.model.FloorType
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
+import com.zhpan.bannerview.BannerViewPager
 
 /**
- * 横幅楼层实现
- * 用于显示横幅广告或轮播图的楼层
+ * 重构后的横幅楼层实现
+ * 使用新的架构：职责分离，统一数据处理
  */
-class BannerFloor : BaseFloor() {
+class BannerFloor : BaseFloor<BannerFloorData>() {
+    
+    private var bannerAdapter: BannerPageAdapter? = null
+    private var bannerViewPager: BannerViewPager<BannerPageData>? = null
     
     override fun getFloorType(): String = FloorType.BANNER.typeName
     
-    override fun onCreateView(parent: ViewGroup): View {
-        return LayoutInflater.from(parent.context).inflate(
-            com.github.flexfloor.R.layout.floor_banner,
-            parent,
-            false
-        )
+    override fun getLayoutResId(): Int = R.layout.floor_banner
+    
+    /**
+     * 解析业务数据 - 统一数据解析入口
+     */
+    override fun parseBusinessData(configData: Map<String, Any>): BannerFloorData? {
+        return try {
+            val gson = Gson()
+            val json = gson.toJson(configData)
+            gson.fromJson(json, BannerFloorData::class.java)
+        } catch (e: Exception) {
+            // 解析失败时手动解析Map数据
+            val title = configData["title"] as? String
+            val titleColor = configData["title_color"] as? String
+            val titleSize = (configData["title_size"] as? Number)?.toFloat()
+            val autoPlay = configData["auto_play"] as? Boolean ?: true
+            val playInterval = (configData["play_interval"] as? Number)?.toLong() ?: 3000L
+            val showIndicators = configData["show_indicators"] as? Boolean ?: true
+            val infiniteLoop = configData["infinite_loop"] as? Boolean ?: true
+            val cornerRadius = (configData["corner_radius"] as? Number)?.toFloat() ?: 8f
+            
+            // 解析页面数据
+            val pages = (configData["pages"] as? List<*>)?.mapNotNull { pageData ->
+                when (pageData) {
+                    is Map<*, *> -> {
+                        BannerPageData(
+                            title = pageData["title"] as? String,
+                            description = pageData["description"] as? String,
+                            backgroundColor = pageData["background_color"] as? String ?: "#2196F3",
+                            linkUrl = pageData["link_url"] as? String,
+                            linkType = pageData["link_type"] as? String
+                        )
+                    }
+                    else -> null
+                }
+            }
+            
+            BannerFloorData(
+                title = title,
+                titleColor = titleColor,
+                titleSize = titleSize,
+                autoPlay = autoPlay,
+                playInterval = playInterval,
+                showIndicators = showIndicators,
+                infiniteLoop = infiniteLoop,
+                cornerRadius = cornerRadius,
+                pages = pages
+            )
+        }
     }
     
-    override fun onBindData(holder: RecyclerView.ViewHolder, floorData: FloorData, position: Int) {
-        val bannerData: BannerFloorData = parseBannerData(floorData.data)
-        
-        val containerView: LinearLayout = holder.itemView.findViewById(com.github.flexfloor.R.id.banner_container)
-        val titleView: TextView = holder.itemView.findViewById(com.github.flexfloor.R.id.banner_title_text)
-        val imageView: ImageView = holder.itemView.findViewById(com.github.flexfloor.R.id.banner_image_view)
+    /**
+     * 渲染视图 - 纯视图渲染逻辑
+     */
+    override fun renderView(view: View, data: BannerFloorData, position: Int) {
+        val titleView: TextView = view.findViewById(R.id.banner_title_text)
+        bannerViewPager = view.findViewById(R.id.banner_view_pager)
         
         // 设置标题
-        titleView.text = bannerData.title ?: floorData.title ?: ""
-        titleView.visibility = if (bannerData.title.isNullOrEmpty()) View.GONE else View.VISIBLE
+        val title = data.title ?: "轮播推荐"
+        titleView.text = title
+        titleView.visibility = if (title.isNotEmpty()) View.VISIBLE else View.GONE
         
         // 设置标题样式
-        bannerData.titleColor?.let { color ->
+        data.titleColor?.let { color ->
             try {
                 titleView.setTextColor(android.graphics.Color.parseColor(color))
             } catch (e: IllegalArgumentException) {
@@ -49,123 +93,108 @@ class BannerFloor : BaseFloor() {
             }
         }
         
-        bannerData.titleSize?.let { size ->
+        data.titleSize?.let { size ->
             titleView.textSize = size
         }
         
-        // 设置横幅图片
-        loadBannerImage(imageView, bannerData.imageUrl)
+        // 初始化轮播适配器
+        bannerAdapter = BannerPageAdapter()
         
-        // 设置横幅高度
-        bannerData.height?.let { height ->
-            val layoutParams: ViewGroup.LayoutParams = imageView.layoutParams
-            layoutParams.height = convertDpToPx(height, holder.itemView.context)
-            imageView.layoutParams = layoutParams
-        }
-        
-        // 设置图片缩放类型
-        imageView.scaleType = when (bannerData.scaleType) {
-            "center_crop" -> ImageView.ScaleType.CENTER_CROP
-            "center_inside" -> ImageView.ScaleType.CENTER_INSIDE
-            "fit_center" -> ImageView.ScaleType.FIT_CENTER
-            "fit_xy" -> ImageView.ScaleType.FIT_XY
-            "matrix" -> ImageView.ScaleType.MATRIX
-            else -> ImageView.ScaleType.CENTER_CROP
-        }
-        
-        // 设置容器背景
-        bannerData.backgroundColor?.let { color ->
-            try {
-                containerView.setBackgroundColor(android.graphics.Color.parseColor(color))
-            } catch (e: IllegalArgumentException) {
-                // 颜色解析失败，使用默认颜色
-            }
-        }
-        
-        // 设置圆角
-        if (bannerData.cornerRadius > 0) {
-            // 设置圆角背景，实际项目中可以使用更复杂的drawable
-            containerView.background = createRoundedBackground(
-                bannerData.backgroundColor ?: "#FFFFFF",
-                bannerData.cornerRadius
-            )
-        }
-    }
-    
-    override fun isSupportLazyLoad(): Boolean = true
-    
-    override fun getPriority(): Int = 3
-    
-
-    
-    /**
-     * 加载横幅图片
-     */
-    private fun loadBannerImage(imageView: ImageView, imageUrl: String?) {
-        if (imageUrl.isNullOrEmpty()) {
-            imageView.setImageResource(android.R.drawable.ic_menu_slideshow)
-            return
-        }
-        
-        // 简单实现，实际项目中建议使用Glide、Picasso等图片加载库
-        try {
-            // 这里可以集成Glide等图片加载库
-            // Glide.with(imageView.context)
-            //     .load(imageUrl)
-            //     .placeholder(android.R.drawable.ic_menu_slideshow)
-            //     .error(android.R.drawable.ic_menu_report_image)
-            //     .centerCrop()
-            //     .into(imageView)
+        // 配置轮播图
+        bannerViewPager?.apply {
+            // 设置适配器
+            adapter = bannerAdapter
             
-            // 暂时使用默认图片
-            imageView.setImageResource(android.R.drawable.ic_menu_slideshow)
-        } catch (e: Exception) {
-            imageView.setImageResource(android.R.drawable.ic_menu_report_image)
-        }
-    }
-    
-    /**
-     * 创建圆角背景
-     */
-    private fun createRoundedBackground(color: String, cornerRadius: Float): android.graphics.drawable.Drawable {
-        val drawable = android.graphics.drawable.GradientDrawable()
-        try {
-            drawable.setColor(android.graphics.Color.parseColor(color))
-        } catch (e: IllegalArgumentException) {
-            drawable.setColor(android.graphics.Color.WHITE)
-        }
-        drawable.cornerRadius = convertDpToPx(cornerRadius.toInt(), null).toFloat()
-        return drawable
-    }
-    
-    /**
-     * dp转px
-     */
-    private fun convertDpToPx(dp: Int, context: android.content.Context?): Int {
-        val displayMetrics = context?.resources?.displayMetrics 
-            ?: android.content.res.Resources.getSystem().displayMetrics
-        val density: Float = displayMetrics.density
-        return (dp * density).toInt()
-    }
-    
-    /**
-     * 解析横幅数据
-     */
-    private fun parseBannerData(data: Any?): BannerFloorData {
-        return try {
-            when (data) {
-                is BannerFloorData -> data
-                is String -> Gson().fromJson(data, BannerFloorData::class.java)
-                is Map<*, *> -> {
-                    val gson = Gson()
-                    val json = gson.toJson(data)
-                    gson.fromJson(json, BannerFloorData::class.java)
-                }
-                else -> BannerFloorData()
+            // 设置轮播属性
+            setAutoPlay(data.autoPlay)
+            setCanLoop(data.infiniteLoop)
+            setInterval(data.playInterval.toInt())
+            
+            // 设置指示器
+            setIndicatorVisibility(if (data.showIndicators) View.VISIBLE else View.GONE)
+            
+            // 设置圆角
+            if (data.cornerRadius > 0) {
+                setRoundCorner(data.cornerRadius.toInt())
             }
-        } catch (e: Exception) {
-            BannerFloorData()
+            
+            // 设置页面点击事件
+            setOnPageClickListener { _, pagePosition ->
+                onFloorClick(view)
+            }
+            
+            // 设置轮播页面数据
+            val pages = data.pages ?: createDefaultPages()
+            create(pages)
+            
+            // 开始轮播
+            if (data.autoPlay && pages.isNotEmpty()) {
+                startLoop()
+            }
         }
+    }
+    
+    /**
+     * 异步加载数据 - 可选的远程数据加载
+     */
+    override suspend fun loadData(): BannerFloorData? {
+        // 这里可以实现远程数据加载逻辑
+        // 例如：从API获取更多轮播内容
+        return null // 当前示例中不需要异步加载
+    }
+    
+    /**
+     * 自定义加载状态显示
+     */
+    override fun showLoadingState(view: View) {
+        val titleView: TextView = view.findViewById(R.id.banner_title_text)
+        titleView.text = "轮播加载中..."
+        titleView.visibility = View.VISIBLE
+    }
+    
+    /**
+     * 自定义错误状态显示
+     */
+    override fun showErrorState(view: View, error: String) {
+        val titleView: TextView = view.findViewById(R.id.banner_title_text)
+        titleView.text = "轮播加载失败: $error"
+        titleView.visibility = View.VISIBLE
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        // 停止轮播，避免内存泄漏
+        bannerViewPager?.stopLoop()
+        bannerViewPager = null
+        bannerAdapter = null
+    }
+    
+    /**
+     * 创建默认轮播页面
+     */
+    private fun createDefaultPages(): List<BannerPageData> {
+        return listOf(
+            BannerPageData(
+                title = "精彩内容 1",
+                description = "这是第一个轮播页面，展示精彩内容",
+                backgroundColor = "#2196F3"
+            ),
+            BannerPageData(
+                title = "优质服务 2", 
+                description = "这是第二个轮播页面，提供优质服务",
+                backgroundColor = "#4CAF50"
+            ),
+            BannerPageData(
+                title = "创新体验 3",
+                description = "这是第三个轮播页面，带来创新体验", 
+                backgroundColor = "#FF9800"
+            ),
+            BannerPageData(
+                title = "贴心关怀 4",
+                description = "这是第四个轮播页面，给您贴心关怀",
+                backgroundColor = "#9C27B0"
+            )
+        )
     }
 }
 
@@ -176,24 +205,6 @@ data class BannerFloorData(
     @SerializedName("title")
     val title: String? = null,
     
-    @SerializedName("image_url")
-    val imageUrl: String? = null,
-    
-    @SerializedName("width")
-    val width: Int? = null,
-    
-    @SerializedName("height")
-    val height: Int = 200,
-    
-    @SerializedName("scale_type")
-    val scaleType: String = "center_crop",
-    
-    @SerializedName("background_color")
-    val backgroundColor: String? = null,
-    
-    @SerializedName("corner_radius")
-    val cornerRadius: Float = 0f,
-    
     @SerializedName("title_color")
     val titleColor: String? = null,
     
@@ -201,7 +212,7 @@ data class BannerFloorData(
     val titleSize: Float? = null,
     
     @SerializedName("auto_play")
-    val autoPlay: Boolean = false,
+    val autoPlay: Boolean = true,
     
     @SerializedName("play_interval")
     val playInterval: Long = 3000L,
@@ -212,19 +223,25 @@ data class BannerFloorData(
     @SerializedName("infinite_loop")
     val infiniteLoop: Boolean = true,
     
-    @SerializedName("images")
-    val images: List<BannerImageData>? = null
+    @SerializedName("corner_radius")
+    val cornerRadius: Float = 8f,
+    
+    @SerializedName("pages")
+    val pages: List<BannerPageData>? = null
 )
 
 /**
- * 横幅图片数据模型
+ * 轮播页面数据模型
  */
-data class BannerImageData(
-    @SerializedName("image_url")
-    val imageUrl: String,
-    
+data class BannerPageData(
     @SerializedName("title")
     val title: String? = null,
+    
+    @SerializedName("description")
+    val description: String? = null,
+    
+    @SerializedName("background_color")
+    val backgroundColor: String = "#2196F3",
     
     @SerializedName("link_url")
     val linkUrl: String? = null,

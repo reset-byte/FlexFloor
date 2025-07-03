@@ -22,15 +22,23 @@
         tools:text="横幅标题"
         tools:visibility="visible" />
 
-    <!-- 横幅图片 -->
-    <ImageView
-        android:id="@+id/banner_image_view"
+    <!-- 轮播图容器 -->
+    <com.zhpan.bannerview.BannerViewPager
+        android:id="@+id/banner_view_pager"
         android:layout_width="match_parent"
         android:layout_height="200dp"
-        android:background="@color/surface_variant"
-        android:contentDescription="横幅图片"
-        android:scaleType="centerCrop"
-        android:src="@android:drawable/ic_menu_slideshow"
-        tools:src="@android:drawable/ic_menu_slideshow" />
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/banner_container_bg"
+        app:bvp_auto_play="true"
+        app:bvp_can_loop="true"
+        app:bvp_interval="3000"
+        app:bvp_round_corner="12dp"
+        app:bvp_indicator_visibility="visible"
+        app:bvp_indicator_style="circle"
+        app:bvp_indicator_slide_mode="normal"
+        app:bvp_indicator_gravity="center"
+        app:bvp_indicator_normal_color="@color/outline_variant"
+        app:bvp_indicator_checked_color="@color/primary" />
 
 </LinearLayout> 
