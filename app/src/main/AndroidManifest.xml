@@ -26,7 +26,7 @@
         
         <activity
             android:name=".FloorDemoActivity"
-            android:exported="false"
+            android:exported="true"
             android:label="楼层化框架演示"
             android:theme="@style/Theme.FlexFloor"
             android:parentActivityName=".MainActivity">

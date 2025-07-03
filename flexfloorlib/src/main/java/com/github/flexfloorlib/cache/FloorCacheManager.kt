@@ -1,5 +1,6 @@
 package com.github.flexfloorlib.cache
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.github.flexfloorlib.model.CachePolicy
 import com.github.flexfloorlib.model.FloorData
@@ -18,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 class FloorCacheManager private constructor(private val context: Context) {
     
     companion object {
+        @SuppressLint("StaticFieldLeak")
         @Volatile
         private var INSTANCE: FloorCacheManager? = null
         
@@ -28,16 +30,16 @@ class FloorCacheManager private constructor(private val context: Context) {
         }
     }
     
-    // Memory cache
+    // 内存缓存
     private val memoryCache = ConcurrentHashMap<String, Any>()
     private val memoryCacheTimestamps = ConcurrentHashMap<String, Long>()
     
-    // Cache configuration
-    private var maxMemoryCacheSize = 50 // Maximum number of items in memory cache
-    private var memoryTtl = 30 * 60 * 1000L // 30 minutes TTL for memory cache
-    private var diskTtl = 24 * 60 * 60 * 1000L // 24 hours TTL for disk cache
+    // 缓存配置
+    private var maxMemoryCacheSize = 50 // 内存缓存最大条目数
+    private var memoryTtl = 30 * 60 * 1000L // 内存缓存30分钟TTL
+    private var diskTtl = 24 * 60 * 60 * 1000L // 磁盘缓存24小时TTL
     
-    // Cache directories
+    // 缓存目录
     private val diskCacheDir by lazy {
         File(context.cacheDir, "floor_cache").apply {
             if (!exists()) mkdirs()
@@ -45,7 +47,11 @@ class FloorCacheManager private constructor(private val context: Context) {
     }
     
     /**
-     * Cache floor data
+     * 缓存楼层数据
+     *
+     * @param key 缓存键
+     * @param data 要缓存的数据
+     * @param policy 缓存策略
      */
     suspend fun cacheFloorData(key: String, data: Any, policy: CachePolicy = CachePolicy.MEMORY) {
         when (policy) {
@@ -56,13 +62,17 @@ class FloorCacheManager private constructor(private val context: Context) {
                 cacheToDisk(key, data)
             }
             CachePolicy.NONE -> {
-                // Do nothing
+                // 不执行任何操作
             }
         }
     }
     
     /**
-     * Get cached floor data
+     * 获取缓存的楼层数据
+     *
+     * @param key 缓存键
+     * @param policy 缓存策略
+     * @return 缓存的数据，如果不存在则返回null
      */
     suspend fun getCachedFloorData(key: String, policy: CachePolicy = CachePolicy.MEMORY): Any? {
         return when (policy) {
@@ -70,7 +80,7 @@ class FloorCacheManager private constructor(private val context: Context) {
             CachePolicy.DISK -> getFromDisk(key)
             CachePolicy.BOTH -> {
                 getFromMemory(key) ?: getFromDisk(key)?.also { data ->
-                    // Promote to memory cache
+                    // 提升到内存缓存
                     cacheToMemory(key, data)
                 }
             }
@@ -79,7 +89,10 @@ class FloorCacheManager private constructor(private val context: Context) {
     }
     
     /**
-     * Cache floor configuration
+     * 缓存楼层配置
+     *
+     * @param floorId 楼层ID
+     * @param floorData 楼层数据
      */
     suspend fun cacheFloorConfig(floorId: String, floorData: FloorData) {
         val key = "config_$floorId"
@@ -87,7 +100,11 @@ class FloorCacheManager private constructor(private val context: Context) {
     }
     
     /**
-     * Get cached floor configuration
+     * 获取缓存的楼层配置
+     *
+     * @param floorId 楼层ID
+     * @param policy 缓存策略
+     * @return 缓存的楼层数据，如果不存在则返回null
      */
     suspend fun getCachedFloorConfig(floorId: String, policy: CachePolicy = CachePolicy.MEMORY): FloorData? {
         val key = "config_$floorId"
@@ -95,10 +112,13 @@ class FloorCacheManager private constructor(private val context: Context) {
     }
     
     /**
-     * Cache to memory
+     * 缓存到内存
+     *
+     * @param key 缓存键
+     * @param data 要缓存的数据
      */
     private fun cacheToMemory(key: String, data: Any) {
-        // Check cache size limit
+        // 检查缓存大小限制
         if (memoryCache.size >= maxMemoryCacheSize) {
             evictOldestMemoryCache()
         }
@@ -108,13 +128,16 @@ class FloorCacheManager private constructor(private val context: Context) {
     }
     
     /**
-     * Get from memory cache
+     * 从内存缓存获取数据
+     *
+     * @param key 缓存键
+     * @return 缓存的数据，如果不存在或过期则返回null
      */
     private fun getFromMemory(key: String): Any? {
         val timestamp = memoryCacheTimestamps[key] ?: return null
         val currentTime = System.currentTimeMillis()
         
-        // Check TTL
+        // 检查TTL
         if (currentTime - timestamp > memoryTtl) {
             memoryCache.remove(key)
             memoryCacheTimestamps.remove(key)
@@ -125,7 +148,10 @@ class FloorCacheManager private constructor(private val context: Context) {
     }
     
     /**
-     * Cache to disk
+     * 缓存到磁盘
+     *
+     * @param key 缓存键
+     * @param data 要缓存的数据
      */
     private suspend fun cacheToDisk(key: String, data: Any) = withContext(Dispatchers.IO) {
         try {
@@ -143,7 +169,10 @@ class FloorCacheManager private constructor(private val context: Context) {
     }
     
     /**
-     * Get from disk cache
+     * 从磁盘缓存获取数据
+     *
+     * @param key 缓存键
+     * @return 缓存的数据，如果不存在或过期则返回null
      */
     private suspend fun getFromDisk(key: String): Any? = withContext(Dispatchers.IO) {
         try {
@@ -155,7 +184,7 @@ class FloorCacheManager private constructor(private val context: Context) {
                     val wrapper = ois.readObject() as CacheWrapper
                     val currentTime = System.currentTimeMillis()
                     
-                    // Check TTL
+                    // 检查TTL
                     if (currentTime - wrapper.timestamp > diskTtl) {
                         file.delete()
                         return@withContext null
@@ -171,7 +200,7 @@ class FloorCacheManager private constructor(private val context: Context) {
     }
     
     /**
-     * Evict oldest memory cache entry
+     * 移除最旧的内存缓存条目
      */
     private fun evictOldestMemoryCache() {
         val oldestEntry = memoryCacheTimestamps.minByOrNull { it.value }
@@ -182,7 +211,7 @@ class FloorCacheManager private constructor(private val context: Context) {
     }
     
     /**
-     * Clear all caches
+     * 清除所有缓存
      */
     suspend fun clearAllCaches() {
         memoryCache.clear()
@@ -194,7 +223,7 @@ class FloorCacheManager private constructor(private val context: Context) {
     }
     
     /**
-     * Clear memory cache only
+     * 仅清除内存缓存
      */
     fun clearMemoryCache() {
         memoryCache.clear()
@@ -202,14 +231,18 @@ class FloorCacheManager private constructor(private val context: Context) {
     }
     
     /**
-     * Clear disk cache only
+     * 仅清除磁盘缓存
      */
     suspend fun clearDiskCache() = withContext(Dispatchers.IO) {
         diskCacheDir.listFiles()?.forEach { it.delete() }
     }
     
     /**
-     * Configure cache settings
+     * 配置缓存设置
+     *
+     * @param maxMemorySize 内存缓存最大条目数
+     * @param memoryTtlMillis 内存缓存TTL（毫秒）
+     * @param diskTtlMillis 磁盘缓存TTL（毫秒）
      */
     fun configureCacheSettings(
         maxMemorySize: Int = 50,
@@ -222,7 +255,7 @@ class FloorCacheManager private constructor(private val context: Context) {
     }
     
     /**
-     * Cache wrapper for disk storage
+     * 磁盘存储的缓存包装器
      */
     private data class CacheWrapper(
         val data: Any,

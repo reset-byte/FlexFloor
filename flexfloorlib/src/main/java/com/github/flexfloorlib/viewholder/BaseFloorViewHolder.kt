@@ -18,20 +18,20 @@ abstract class BaseFloorViewHolder(itemView: View) : RecyclerView.ViewHolder(ite
     /**
      * Bind floor data to view
      */
-    open fun bindFloor(floorData: FloorData, floor: BaseFloor<*>?, position: Int) {
+    fun bindFloor(floorData: FloorData, floor: BaseFloor<*>?, position: Int) {
         this.floorData = floorData
         this.floor = floor
         
-        // Apply basic styling
+        // 应用基础样式
         applyFloorConfig(floorData)
         
-        // Bind floor-specific data
+        // 绑定楼层特定数据
         floor?.bindView(itemView, position)
         
-        // Setup click listener
+        // 设置点击监听器
         setupClickListener()
         
-        // Setup exposure tracking
+        // 设置曝光追踪
         setupExposureTracking()
     }
     
@@ -40,69 +40,78 @@ abstract class BaseFloorViewHolder(itemView: View) : RecyclerView.ViewHolder(ite
      */
     private fun applyFloorConfig(floorData: FloorData) {
         val config = floorData.floorConfig
-        val layoutParams = itemView.layoutParams as RecyclerView.LayoutParams
         
-        // Apply margins
-        layoutParams.setMargins(
-            config.margin.left,
-            config.margin.top,
-            config.margin.right,
-            config.margin.bottom
-        )
+        // 应用外边距（将dp转换为px）
+        val marginLeft = convertDpToPx(config.margin.left.toFloat(), itemView.context)
+        val marginTop = convertDpToPx(config.margin.top.toFloat(), itemView.context)
+        val marginRight = convertDpToPx(config.margin.right.toFloat(), itemView.context)
+        val marginBottom = convertDpToPx(config.margin.bottom.toFloat(), itemView.context)
         
-        // Apply padding
+        if (itemView.layoutParams is android.view.ViewGroup.MarginLayoutParams) {
+            val marginParams = itemView.layoutParams as android.view.ViewGroup.MarginLayoutParams
+            marginParams.setMargins(
+                marginLeft.toInt(),
+                marginTop.toInt(),
+                marginRight.toInt(),
+                marginBottom.toInt()
+            )
+            itemView.layoutParams = marginParams
+        }
+        
+        // 应用内边距（将dp转换为px）
+        val paddingLeft = convertDpToPx(config.padding.left.toFloat(), itemView.context)
+        val paddingTop = convertDpToPx(config.padding.top.toFloat(), itemView.context)
+        val paddingRight = convertDpToPx(config.padding.right.toFloat(), itemView.context)
+        val paddingBottom = convertDpToPx(config.padding.bottom.toFloat(), itemView.context)
+        
         itemView.setPadding(
-            config.padding.left,
-            config.padding.top,
-            config.padding.right,
-            config.padding.bottom
+            paddingLeft.toInt(),
+            paddingTop.toInt(),
+            paddingRight.toInt(),
+            paddingBottom.toInt()
         )
         
-        // Apply background color and corner radius together
+        // 应用背景色和圆角半径
         applyBackgroundWithCornerRadius(config)
         
-        // Apply elevation
+        // 应用阴影
         if (config.elevation > 0) {
             itemView.elevation = config.elevation
         }
-        
-        itemView.layoutParams = layoutParams
     }
     
     /**
      * Apply background color and corner radius using GradientDrawable
      */
     private fun applyBackgroundWithCornerRadius(config: com.github.flexfloorlib.model.FloorConfig) {
-        val drawable = android.graphics.drawable.GradientDrawable()
-        
-        // Set background color
-        config.backgroundColor?.let { color ->
-            try {
-                drawable.setColor(android.graphics.Color.parseColor(color))
-            } catch (e: Exception) {
-                e.printStackTrace()
-                drawable.setColor(android.graphics.Color.WHITE) // 默认白色
+        if (config.cornerRadius > 0 || config.backgroundColor != null) {
+            val drawable = android.graphics.drawable.GradientDrawable()
+            
+            // 设置背景颜色
+            if (config.backgroundColor != null) {
+                try {
+                    drawable.setColor(android.graphics.Color.parseColor(config.backgroundColor))
+                } catch (e: IllegalArgumentException) {
+                    // 颜色解析失败，使用默认颜色
+                    drawable.setColor(android.graphics.Color.WHITE)
+                }
             }
-        } ?: run {
-            drawable.setColor(android.graphics.Color.TRANSPARENT) // 默认透明
+            
+            // 设置圆角半径
+            if (config.cornerRadius > 0) {
+                drawable.cornerRadius = convertDpToPx(config.cornerRadius, itemView.context)
+            }
+            
+            // 应用drawable作为背景
+            itemView.background = drawable
         }
-        
-        // Set corner radius
-        if (config.cornerRadius > 0) {
-            val cornerRadiusPx = convertDpToPx(config.cornerRadius, itemView.context)
-            drawable.cornerRadius = cornerRadiusPx
-        }
-        
-        // Apply the drawable as background
-        itemView.background = drawable
     }
     
     /**
      * Convert dp to px
      */
     private fun convertDpToPx(dp: Float, context: android.content.Context): Float {
-        val density = context.resources.displayMetrics.density
-        return dp * density
+        return dp * context.resources.displayMetrics.density
     }
     
     /**
@@ -110,9 +119,9 @@ abstract class BaseFloorViewHolder(itemView: View) : RecyclerView.ViewHolder(ite
      */
     private fun setupClickListener() {
         if (floorData?.floorConfig?.clickable == true) {
-            itemView.setOnClickListener { view ->
-                floor?.onFloorClick(view)
-                onFloorClicked(view)
+            itemView.setOnClickListener {
+                floor?.onFloorClick(it)
+                onFloorClicked(it)
             }
         } else {
             itemView.setOnClickListener(null)

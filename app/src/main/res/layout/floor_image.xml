@@ -4,8 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:orientation="vertical">
 
     <!-- 图片显示区域 -->
     <ImageView
@@ -13,10 +12,9 @@
         android:layout_width="match_parent"
         android:layout_height="200dp"
         android:layout_marginBottom="12dp"
-        android:background="@color/surface_variant"
         android:contentDescription="楼层图片"
         android:scaleType="centerCrop"
-        android:src="@android:drawable/ic_menu_gallery" />
+        android:src="@drawable/ic_image" />
 
     <!-- 标题文本 -->
     <com.google.android.material.textview.MaterialTextView

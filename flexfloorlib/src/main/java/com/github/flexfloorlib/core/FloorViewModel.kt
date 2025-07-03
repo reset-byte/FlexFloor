@@ -9,13 +9,13 @@ import com.github.flexfloorlib.model.FloorData
 import kotlinx.coroutines.launch
 
 /**
- * ViewModel for managing floor data in MVVM architecture
+ * 楼层数据管理的 ViewModel，用于 MVVM 架构
  */
 class FloorViewModel(application: Application) : AndroidViewModel(application) {
     
     private val repository = FloorRepository.getInstance(application)
     
-    // LiveData for floor data
+    // 楼层数据的 LiveData
     private val _floorDataList = MutableLiveData<List<FloorData>>()
     val floorDataList: LiveData<List<FloorData>> = _floorDataList
     
@@ -32,7 +32,7 @@ class FloorViewModel(application: Application) : AndroidViewModel(application) {
     val floorExposureEvent: LiveData<Pair<String, Map<String, Any>>> = _floorExposureEvent
     
     /**
-     * Load floor configuration for a page
+     * 加载页面的楼层配置
      */
     fun loadFloorConfig(pageId: String, useCache: Boolean = true) {
         viewModelScope.launch {
@@ -44,7 +44,7 @@ class FloorViewModel(application: Application) : AndroidViewModel(application) {
                 _floorDataList.value = floorConfig
                 
             } catch (e: Exception) {
-                _error.value = e.message ?: "Failed to load floor configuration"
+                _error.value = e.message ?: "加载楼层配置失败"
                 e.printStackTrace()
             } finally {
                 _isLoading.value = false
@@ -53,14 +53,14 @@ class FloorViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     /**
-     * Refresh floor configuration
+     * 刷新楼层配置
      */
     fun refreshFloorConfig(pageId: String) {
         loadFloorConfig(pageId, useCache = false)
     }
     
     /**
-     * Add a floor to the current list
+     * 添加楼层到当前列表
      */
     fun addFloor(floorData: FloorData, position: Int = -1) {
         val currentList = _floorDataList.value?.toMutableList() ?: mutableListOf()
@@ -75,7 +75,7 @@ class FloorViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     /**
-     * Remove a floor from the current list
+     * 从当前列表移除楼层
      */
     fun removeFloor(position: Int) {
         val currentList = _floorDataList.value?.toMutableList() ?: return
@@ -87,7 +87,7 @@ class FloorViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     /**
-     * Update a floor in the current list
+     * 更新当前列表中的楼层
      */
     fun updateFloor(position: Int, floorData: FloorData) {
         val currentList = _floorDataList.value?.toMutableList() ?: return
@@ -99,37 +99,37 @@ class FloorViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     /**
-     * Handle floor click event
+     * 处理楼层点击事件
      */
     fun onFloorClicked(floorData: FloorData, position: Int) {
         _floorClickEvent.value = Pair(floorData, position)
     }
     
     /**
-     * Handle floor exposure event
+     * 处理楼层曝光事件
      */
     fun onFloorExposed(floorId: String, exposureData: Map<String, Any>) {
         _floorExposureEvent.value = Pair(floorId, exposureData)
     }
     
     /**
-     * Load floor business data
+     * 加载楼层业务数据
      */
     fun loadFloorData(floorId: String, floorType: String, params: Map<String, Any> = emptyMap()) {
         viewModelScope.launch {
             try {
                 val data = repository.loadFloorData(floorId, floorType, params)
-                // Handle loaded data - could emit through another LiveData if needed
+                // 处理加载的数据 - 如果需要，可以通过另一个 LiveData 发出
                 
             } catch (e: Exception) {
-                _error.value = "Failed to load floor data: ${e.message}"
+                _error.value = "加载楼层数据失败: ${e.message}"
                 e.printStackTrace()
             }
         }
     }
     
     /**
-     * Update floor configuration and persist
+     * 更新楼层配置并持久化
      */
     fun updateFloorConfig(pageId: String, floorConfig: List<FloorData>) {
         viewModelScope.launch {
@@ -138,14 +138,14 @@ class FloorViewModel(application: Application) : AndroidViewModel(application) {
                 _floorDataList.value = floorConfig
                 
             } catch (e: Exception) {
-                _error.value = "Failed to update floor configuration: ${e.message}"
+                _error.value = "更新楼层配置失败: ${e.message}"
                 e.printStackTrace()
             }
         }
     }
     
     /**
-     * Clear cache
+     * 清除缓存
      */
     fun clearCache() {
         viewModelScope.launch {
@@ -158,7 +158,7 @@ class FloorViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     /**
-     * Set data sources
+     * 设置数据源
      */
     fun setRemoteDataSource(dataSource: FloorRemoteDataSource) {
         repository.setRemoteDataSource(dataSource)

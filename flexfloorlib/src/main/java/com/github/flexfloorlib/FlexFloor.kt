@@ -15,7 +15,14 @@ import com.github.flexfloorlib.model.FloorType
 object FlexFloor {
     
     /**
-     * 使用上下文和生命周期所有者初始化FlexFloor
+     * 使用上下文初始化FlexFloor（需要手动管理生命周期）
+     */
+    fun with(context: Context): FloorBuilder {
+        return FloorBuilder(context, null)
+    }
+    
+    /**
+     * 使用上下文和生命周期所有者初始化FlexFloor（自动管理生命周期）
      */
     fun with(context: Context, lifecycleOwner: LifecycleOwner): FloorBuilder {
         return FloorBuilder(context, lifecycleOwner)
@@ -53,7 +60,7 @@ object FlexFloor {
  */
 class FloorBuilder internal constructor(
     private val context: Context,
-    private val lifecycleOwner: LifecycleOwner
+    private val lifecycleOwner: LifecycleOwner? = null
 ) {
     
     private var enablePreloading = true
@@ -81,7 +88,13 @@ class FloorBuilder internal constructor(
      * 构建并与RecyclerView关联
      */
     fun setupWith(recyclerView: RecyclerView): FloorManager {
-        return FloorManager.create(context, lifecycleOwner)
+        val floorManager = if (lifecycleOwner != null) {
+            FloorManager.create(context, lifecycleOwner)
+        } else {
+            FloorManager.create(context)
+        }
+        
+        return floorManager
             .enablePreloading(enablePreloading, preloadDistance)
             .enableStickyFloors(enableStickyFloors)
             .setupWithRecyclerView(recyclerView)

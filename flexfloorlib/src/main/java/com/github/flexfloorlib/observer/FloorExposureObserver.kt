@@ -8,7 +8,7 @@ import android.view.ViewTreeObserver
 import com.github.flexfloorlib.model.ExposureConfig
 
 /**
- * Observer for tracking floor exposure and visibility
+ * 楼层曝光和可见性追踪观察者
  */
 class FloorExposureObserver(
     private val view: View,
@@ -32,7 +32,7 @@ class FloorExposureObserver(
     }
     
     /**
-     * Start tracking exposure
+     * 开始追踪曝光
      */
     fun startTracking() {
         if (isTracking) return
@@ -41,12 +41,12 @@ class FloorExposureObserver(
         view.viewTreeObserver.addOnGlobalLayoutListener(globalLayoutListener)
         view.viewTreeObserver.addOnScrollChangedListener(scrollChangeListener)
         
-        // Initial check
+        // 初始检查
         checkExposure()
     }
     
     /**
-     * Stop tracking exposure
+     * 停止追踪曝光
      */
     fun stopTracking() {
         if (!isTracking) return
@@ -58,7 +58,7 @@ class FloorExposureObserver(
         exposureCheckRunnable?.let { handler.removeCallbacks(it) }
         exposureCheckRunnable = null
         
-        // Reset exposure state
+        // 重置曝光状态
         if (isExposed) {
             isExposed = false
             exposureStartTime = 0L
@@ -66,7 +66,7 @@ class FloorExposureObserver(
     }
     
     /**
-     * Check if view is currently exposed
+     * 检查视图是否当前处于曝光状态
      */
     private fun checkExposure() {
         if (!isTracking) return
@@ -74,26 +74,26 @@ class FloorExposureObserver(
         val isCurrentlyVisible = isViewVisible()
         
         if (isCurrentlyVisible && !isExposed) {
-            // Start exposure
+            // 开始曝光
             isExposed = true
             exposureStartTime = System.currentTimeMillis()
             
-            // Schedule exposure duration check
+            // 安排曝光持续时间检查
             scheduleExposureCheck()
             
         } else if (!isCurrentlyVisible && isExposed) {
-            // End exposure
+            // 结束曝光
             isExposed = false
             exposureStartTime = 0L
             
-            // Cancel pending exposure check
+            // 取消待定的曝光检查
             exposureCheckRunnable?.let { handler.removeCallbacks(it) }
             exposureCheckRunnable = null
         }
     }
     
     /**
-     * Check if view is visible according to exposure config
+     * 根据曝光配置检查视图是否可见
      */
     private fun isViewVisible(): Boolean {
         if (!view.isShown) return false
@@ -119,7 +119,7 @@ class FloorExposureObserver(
     }
     
     /**
-     * Schedule exposure duration check
+     * 安排曝光持续时间检查
      */
     private fun scheduleExposureCheck() {
         exposureCheckRunnable?.let { handler.removeCallbacks(it) }
@@ -128,7 +128,7 @@ class FloorExposureObserver(
             if (isExposed && isTracking) {
                 val exposureDuration = System.currentTimeMillis() - exposureStartTime
                 if (exposureDuration >= exposureConfig.minVisibleDuration) {
-                    // Fire exposure event
+                    // 触发曝光事件
                     fireExposureEvent()
                 }
             }
@@ -138,7 +138,7 @@ class FloorExposureObserver(
     }
     
     /**
-     * Fire exposure event
+     * 触发曝光事件
      */
     private fun fireExposureEvent() {
         val exposureData = mutableMapOf<String, Any>().apply {

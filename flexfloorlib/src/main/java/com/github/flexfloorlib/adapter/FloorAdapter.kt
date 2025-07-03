@@ -148,7 +148,7 @@ class FloorAdapter : RecyclerView.Adapter<BaseFloorViewHolder>() {
                 onFloorLoadListener?.invoke(floorData)
                 val data = floor.loadData()
                 @Suppress("UNCHECKED_CAST")
-                (floor as BaseFloor<Any?>).initFloor(floorData, data)
+                (floor as BaseFloor<Any>).initFloor(floorData, data)
             } catch (e: Exception) {
                 e.printStackTrace()
             }

@@ -2,6 +2,8 @@ package com.github.flexfloorlib.core
 
 import android.content.Context
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.github.flexfloorlib.adapter.FloorAdapter
@@ -14,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 楼层化布局系统的核心管理器
@@ -21,10 +24,20 @@ import kotlinx.coroutines.launch
  */
 class FloorManager private constructor(
     private val context: Context,
-    private val lifecycleOwner: LifecycleOwner
+    private val lifecycleOwner: LifecycleOwner? = null
 ) {
     
     companion object {
+        /**
+         * 创建FloorManager实例（需要手动管理生命周期）
+         */
+        fun create(context: Context): FloorManager {
+            return FloorManager(context, null)
+        }
+        
+        /**
+         * 创建FloorManager实例（自动管理生命周期）
+         */
         fun create(context: Context, lifecycleOwner: LifecycleOwner): FloorManager {
             return FloorManager(context, lifecycleOwner)
         }
@@ -34,6 +47,18 @@ class FloorManager private constructor(
     private val cacheManager = FloorCacheManager.getInstance(context)
     private var preloader: FloorPreloader? = null
     private var stickyHelper: StickyFloorHelper? = null
+    private var isDestroyed = false
+    
+    init {
+        // 如果提供了lifecycleOwner，自动管理生命周期
+        lifecycleOwner?.lifecycle?.addObserver(object : LifecycleEventObserver {
+            override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
+                if (event == Lifecycle.Event.ON_DESTROY) {
+                    destroy()
+                }
+            }
+        })
+    }
     
     // 核心组件
     private var recyclerView: RecyclerView? = null
@@ -174,19 +199,23 @@ class FloorManager private constructor(
      * 按加载策略处理楼层
      */
     private suspend fun processFloorsByLoadPolicy(floorDataList: List<FloorData>): List<FloorData> {
-        return floorDataList.map { floorData ->
-            when (floorData.loadPolicy) {
-                LoadPolicy.EAGER -> {
-                    // 立即加载
-                    loadFloorDataImmediately(floorData)
-                }
-                LoadPolicy.PRELOAD -> {
-                    // 安排预加载
-                    scheduleFloorPreload(floorData)
-                }
-                LoadPolicy.LAZY -> {
-                    // 保持原样，将在可见时加载
-                    floorData
+        return withContext(Dispatchers.Default) {
+            floorDataList.map { floorData ->
+                when (floorData.loadPolicy) {
+                    LoadPolicy.EAGER -> {
+                        // 立即加载楼层数据
+                        loadFloorDataImmediately(floorData)
+                        floorData
+                    }
+                    LoadPolicy.LAZY -> {
+                        // 懒加载策略，仅返回配置
+                        floorData
+                    }
+                    LoadPolicy.PRELOAD -> {
+                        // 预加载策略，异步加载数据
+                        preloadFloorData(floorData)
+                        floorData
+                    }
                 }
             }
         }
@@ -195,25 +224,36 @@ class FloorManager private constructor(
     /**
      * 立即加载楼层数据
      */
-    private suspend fun loadFloorDataImmediately(floorData: FloorData): FloorData {
-        return try {
+    private suspend fun loadFloorDataImmediately(floorData: FloorData) {
+        try {
             val floor = FloorFactory.createFloor(floorData)
-            val data = floor?.loadData()
-            @Suppress("UNCHECKED_CAST")
-            (floor as BaseFloor<Any?>?)?.initFloor(floorData, data)
-            floorData
+            if (floor != null) {
+                val data = floor.loadData()
+                // 缓存加载的数据
+                if (data != null) {
+                    cacheManager.cacheFloorData(
+                        "${floorData.floorId}_data",
+                        data,
+                        floorData.cachePolicy
+                    )
+                }
+            }
         } catch (e: Exception) {
-            onFloorErrorListener?.invoke("加载楼层数据失败: ${floorData.floorId}", e)
-            floorData
+            e.printStackTrace()
         }
     }
     
     /**
-     * 安排楼层预加载
+     * 预加载楼层数据
      */
-    private fun scheduleFloorPreload(floorData: FloorData): FloorData {
-        preloader?.schedulePreload(floorData)
-        return floorData
+    private fun preloadFloorData(floorData: FloorData) {
+        floorScope.launch {
+            try {
+                loadFloorDataImmediately(floorData)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
     
     /**
@@ -318,6 +358,8 @@ class FloorManager private constructor(
         stickyHelper = null
         floorAdapter = null
         recyclerView = null
+        
+        isDestroyed = true
     }
     
     /**

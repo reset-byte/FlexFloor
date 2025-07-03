@@ -8,10 +8,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Repository for floor data management
- * Coordinates between network, cache, and local data sources
+ * 楼层数据管理仓库
+ * 协调网络、缓存和本地数据源之间的交互
  */
-class FloorRepository private constructor(private val context: Context) {
+class FloorRepository private constructor(context: Context) {
     
     companion object {
         @Volatile
@@ -26,31 +26,31 @@ class FloorRepository private constructor(private val context: Context) {
     
     private val cacheManager = FloorCacheManager.getInstance(context)
     
-    // Data source interfaces (to be implemented by app)
+    // 数据源接口（由应用程序实现）
     private var remoteDataSource: FloorRemoteDataSource? = null
     private var localDataSource: FloorLocalDataSource? = null
     
     /**
-     * Set remote data source
+     * 设置远程数据源
      */
     fun setRemoteDataSource(dataSource: FloorRemoteDataSource) {
         this.remoteDataSource = dataSource
     }
     
     /**
-     * Set local data source
+     * 设置本地数据源
      */
     fun setLocalDataSource(dataSource: FloorLocalDataSource) {
         this.localDataSource = dataSource
     }
     
     /**
-     * Load floor configuration from various sources
+     * 从各种数据源加载楼层配置
      */
     suspend fun loadFloorConfig(pageId: String, useCache: Boolean = true): List<FloorData> {
         return withContext(Dispatchers.IO) {
             try {
-                // Try cache first if enabled
+                // 如果启用缓存，首先尝试缓存
                 if (useCache) {
                     val cachedConfig = getCachedFloorConfig(pageId)
                     if (cachedConfig.isNotEmpty()) {
@@ -58,46 +58,46 @@ class FloorRepository private constructor(private val context: Context) {
                     }
                 }
                 
-                // Try remote source
+                // 尝试远程数据源
                 val remoteConfig = remoteDataSource?.loadFloorConfig(pageId)
                 if (!remoteConfig.isNullOrEmpty()) {
-                    // Cache the result
+                    // 缓存结果
                     cacheFloorConfig(pageId, remoteConfig)
                     return@withContext remoteConfig
                 }
                 
-                // Fallback to local source
+                // 回退到本地数据源
                 localDataSource?.loadFloorConfig(pageId) ?: emptyList()
                 
             } catch (e: Exception) {
-                // Fallback to cached data on error
+                // 出错时回退到缓存数据
                 getCachedFloorConfig(pageId)
             }
         }
     }
     
     /**
-     * Load floor business data
+     * 加载楼层业务数据
      */
     suspend fun loadFloorData(floorId: String, floorType: String, params: Map<String, Any> = emptyMap()): Any? {
         return withContext(Dispatchers.IO) {
             try {
-                // Try cache first
+                // 首先尝试缓存
                 val cacheKey = "data_${floorId}_${floorType}"
                 val cachedData = cacheManager.getCachedFloorData(cacheKey, CachePolicy.BOTH)
                 if (cachedData != null) {
                     return@withContext cachedData
                 }
                 
-                // Load from remote
+                // 从远程加载
                 val remoteData = remoteDataSource?.loadFloorData(floorId, floorType, params)
                 if (remoteData != null) {
-                    // Cache the result
+                    // 缓存结果
                     cacheManager.cacheFloorData(cacheKey, remoteData, CachePolicy.BOTH)
                     return@withContext remoteData
                 }
                 
-                // Fallback to local
+                // 回退到本地
                 localDataSource?.loadFloorData(floorId, floorType, params)
                 
             } catch (e: Exception) {
@@ -108,20 +108,20 @@ class FloorRepository private constructor(private val context: Context) {
     }
     
     /**
-     * Cache floor configuration
+     * 缓存楼层配置
      */
     private suspend fun cacheFloorConfig(pageId: String, floorConfig: List<FloorData>) {
         val cacheKey = "config_$pageId"
         cacheManager.cacheFloorData(cacheKey, floorConfig, CachePolicy.BOTH)
         
-        // Cache individual floor configs
+        // 缓存单个楼层配置
         floorConfig.forEach { floorData ->
             cacheManager.cacheFloorConfig(floorData.floorId, floorData)
         }
     }
     
     /**
-     * Get cached floor configuration
+     * 获取缓存的楼层配置
      */
     private suspend fun getCachedFloorConfig(pageId: String): List<FloorData> {
         val cacheKey = "config_$pageId"
@@ -130,17 +130,17 @@ class FloorRepository private constructor(private val context: Context) {
     }
     
     /**
-     * Update floor configuration
+     * 更新楼层配置
      */
     suspend fun updateFloorConfig(pageId: String, floorConfig: List<FloorData>) {
         cacheFloorConfig(pageId, floorConfig)
         
-        // Optionally sync to remote
+        // 可选择同步到远程
         remoteDataSource?.updateFloorConfig(pageId, floorConfig)
     }
     
     /**
-     * Clear cache for specific page
+     * 清除特定页面的缓存
      */
     suspend fun clearPageCache(pageId: String) {
         val cacheKey = "config_$pageId"
@@ -148,7 +148,7 @@ class FloorRepository private constructor(private val context: Context) {
     }
     
     /**
-     * Clear all cache
+     * 清除所有缓存
      */
     suspend fun clearAllCache() {
         cacheManager.clearAllCaches()
@@ -156,7 +156,7 @@ class FloorRepository private constructor(private val context: Context) {
 }
 
 /**
- * Interface for remote floor data source
+ * 远程楼层数据源接口
  */
 interface FloorRemoteDataSource {
     suspend fun loadFloorConfig(pageId: String): List<FloorData>?
@@ -165,7 +165,7 @@ interface FloorRemoteDataSource {
 }
 
 /**
- * Interface for local floor data source
+ * 本地楼层数据源接口
  */
 interface FloorLocalDataSource {
     suspend fun loadFloorConfig(pageId: String): List<FloorData>?

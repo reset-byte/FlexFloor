@@ -45,10 +45,10 @@ class FloorPreloader(
             isAttached = true
         }
         
-        // Initial preload check
+        // 初始预加载检查
         checkPreloadConditions()
         
-        // Process preload queue
+        // 处理预加载队列
         processPreloadQueue()
     }
     

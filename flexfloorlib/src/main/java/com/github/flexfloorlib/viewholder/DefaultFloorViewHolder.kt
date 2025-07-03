@@ -7,6 +7,6 @@ import android.view.View
  */
 class DefaultFloorViewHolder(itemView: View) : BaseFloorViewHolder(itemView) {
     
-    // Default implementation uses the base class behavior
-    // Specific floor types should have their own ViewHolder implementations
+    // 默认实现使用基类行为
+    // 特定楼层类型应该有自己的ViewHolder实现
 } 

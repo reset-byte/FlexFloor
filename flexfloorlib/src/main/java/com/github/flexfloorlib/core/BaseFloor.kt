@@ -1,10 +1,7 @@
 package com.github.flexfloorlib.core
 
 import android.view.View
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.lifecycleScope
 import com.github.flexfloorlib.model.FloorData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

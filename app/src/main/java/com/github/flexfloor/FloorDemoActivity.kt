@@ -2,6 +2,7 @@ package com.github.flexfloor
 
 import android.os.Bundle
 import android.view.View
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -20,70 +21,95 @@ import com.github.flexfloorlib.model.EdgeInsets
  * 楼层化框架演示页面
  */
 class FloorDemoActivity : ComponentActivity() {
-    
+
     private lateinit var binding: ActivityFloorDemoBinding
     private lateinit var floorManager: FloorManager
-    
+
+    /**
+     * 初始化活动并设置楼层演示
+     * 设置视图绑定、注册楼层类型、初始化楼层管理器、配置UI组件和加载演示楼层
+     *
+     * @param savedInstanceState 保存的实例状态包
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         binding = ActivityFloorDemoBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        
+
         registerFloorTypes()
         initFloorManager()
         setupUI()
         loadDemoFloors()
     }
-    
+
+    /**
+     * 向FloorFactory注册所有可用的楼层类型
+     * 将楼层类型映射到对应的楼层实现类
+     */
     private fun registerFloorTypes() {
         FloorFactory.registerFloor(FloorType.TEXT) { TextFloor() }
         FloorFactory.registerFloor(FloorType.IMAGE) { ImageFloor() }
         FloorFactory.registerFloor(FloorType.BANNER) { BannerFloor() }
     }
-    
+
+    /**
+     * 初始化和配置FloorManager
+     * 设置RecyclerView集成、启用预加载和吸顶楼层功能、配置点击和曝光监听器
+     */
     private fun initFloorManager() {
-        floorManager = FloorManager.create(this, this)
+        floorManager = FloorManager.create(this)
             .setupWithRecyclerView(binding.recyclerView)
-            .enablePreloading(true, 3)
+            .enablePreloading(true, 5)
             .enableStickyFloors(true)
             .setOnFloorClickListener { floorData, position ->
                 // 处理楼层点击事件
+                Toast.makeText(this, "${floorData.floorType.typeName}楼层点击位置$position", Toast.LENGTH_LONG)
             }
             .setOnFloorExposureListener { floorId, _ ->
                 // 处理楼层曝光统计
+                Toast.makeText(this, "${floorId}楼层曝光", Toast.LENGTH_LONG)
             }
     }
-    
+
+    /**
+     * 配置UI组件并设置事件监听器
+     * 设置下拉刷新布局、悬浮操作按钮和其他UI交互
+     */
     private fun setupUI() {
-        // 注意：当前布局没有toolbar，如果需要可以后续添加
-        // binding.toolbar.setNavigationOnClickListener {
-        //     finish()
-        // }
-        
         binding.swipeRefreshLayout.setOnRefreshListener {
             loadDemoFloors()
             binding.swipeRefreshLayout.isRefreshing = false
         }
-        
+
         binding.fab.setOnClickListener {
             addTestFloor()
         }
     }
-    
+
+    /**
+     * 加载演示楼层到RecyclerView
+     * 在加载过程中显示进度指示器并管理视图可见性状态
+     */
     private fun loadDemoFloors() {
         lifecycleScope.launch {
             binding.progressIndicator.visibility = View.VISIBLE
-            
+
             val floorList = createDemoFloors()
             floorManager.loadFloors(floorList)
-            
+
             binding.progressIndicator.visibility = View.GONE
             binding.recyclerView.visibility = View.VISIBLE
             binding.emptyStateLayout.visibility = View.GONE
         }
     }
-    
+
+    /**
+     * 创建具有各种配置的演示楼层列表
+     * 包括轮播楼层、文本楼层和图片楼层，具有不同的样式选项
+     *
+     * @return List<FloorData> 包含演示楼层配置的列表
+     */
     private fun createDemoFloors(): List<FloorData> {
         return listOf(
             // 轮播楼层
@@ -91,7 +117,7 @@ class FloorDemoActivity : ComponentActivity() {
                 floorId = "demo_banner_floor",
                 floorType = FloorType.BANNER,
                 floorConfig = FloorConfig(
-                    margin = EdgeInsets(16, 16, 16, 16),
+                    margin = EdgeInsets(16, 8, 16, 8),
                     padding = EdgeInsets(16, 16, 16, 16),
                     cornerRadius = 16f,
                     backgroundColor = "#FFFFFF",
@@ -131,17 +157,17 @@ class FloorDemoActivity : ComponentActivity() {
                     )
                 )
             ),
-            
+
             // 文本楼层
             FloorData(
                 floorId = "demo_text_floor",
                 floorType = FloorType.TEXT,
                 floorConfig = FloorConfig(
-                    margin = EdgeInsets(16, 16, 16, 16),
+                    margin = EdgeInsets(16, 8, 16, 8),
                     padding = EdgeInsets(16, 16, 16, 16),
-                    cornerRadius = 8f,
+                    cornerRadius = 16f,
                     backgroundColor = "#FFFFFF",
-                    elevation = 1f,
+                    elevation = 2f,
                     clickable = true
                 ),
                 businessData = mapOf(
@@ -153,15 +179,15 @@ class FloorDemoActivity : ComponentActivity() {
                     "content_size" to 14f
                 )
             ),
-            
+
             // 图片楼层
             FloorData(
                 floorId = "demo_image_floor",
                 floorType = FloorType.IMAGE,
                 floorConfig = FloorConfig(
-                    margin = EdgeInsets(16, 16, 16, 16),
+                    margin = EdgeInsets(16, 8, 16, 8),
                     padding = EdgeInsets(12, 12, 12, 12),
-                    cornerRadius = 8f,
+                    cornerRadius = 16f,
                     backgroundColor = "#FFFFFF",
                     elevation = 2f,
                     clickable = true
@@ -177,13 +203,17 @@ class FloorDemoActivity : ComponentActivity() {
             )
         )
     }
-    
+
+    /**
+     * 动态添加测试楼层到RecyclerView
+     * 创建具有唯一ID的新文本楼层并将其添加到楼层管理器
+     */
     private fun addTestFloor() {
         val testFloor = FloorData(
             floorId = "test_floor_${System.currentTimeMillis()}",
             floorType = FloorType.TEXT,
             floorConfig = FloorConfig(
-                margin = EdgeInsets(16, 16, 16, 16),
+                margin = EdgeInsets(16, 8, 16, 8),
                 padding = EdgeInsets(16, 16, 16, 16),
                 cornerRadius = 8f,
                 backgroundColor = "#FFFFFF",
@@ -197,7 +227,7 @@ class FloorDemoActivity : ComponentActivity() {
                 "content_color" to "#424242"
             )
         )
-        
+
         lifecycleScope.launch {
             floorManager.addFloor(testFloor)
         }
