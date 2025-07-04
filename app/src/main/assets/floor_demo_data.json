@@ -1,0 +1,143 @@
+{
+  "success": true,
+  "data": [
+    {
+      "floorId": "demo_banner_floor",
+      "floorType": "banner",
+      "floorConfig": {
+        "margin": {
+          "left": 16,
+          "top": 8,
+          "right": 16,
+          "bottom": 8
+        },
+        "padding": {
+          "left": 16,
+          "top": 16,
+          "right": 16,
+          "bottom": 16
+        },
+        "cornerRadius": 16.0,
+        "backgroundColor": "#FFFFFF",
+        "elevation": 2.0,
+        "clickable": true,
+        "jumpAction": null,
+        "customStyle": {}
+      },
+      "businessData": {
+        "title": "精彩推荐",
+        "title_color": "#333333",
+        "title_size": 18.0,
+        "auto_play": true,
+        "play_interval": 3000,
+        "show_indicators": true,
+        "infinite_loop": true,
+        "corner_radius": 12.0,
+        "pages": [
+          {
+            "title": "精彩内容 1",
+            "description": "这是第一个轮播页面，展示精彩内容",
+            "background_color": "#2196F3"
+          },
+          {
+            "title": "优质服务 2",
+            "description": "这是第二个轮播页面，提供优质服务",
+            "background_color": "#4CAF50"
+          },
+          {
+            "title": "创新体验 3",
+            "description": "这是第三个轮播页面，带来创新体验",
+            "background_color": "#FF9800"
+          },
+          {
+            "title": "贴心关怀 4",
+            "description": "这是第四个轮播页面，给您贴心关怀",
+            "background_color": "#9C27B0"
+          }
+        ]
+      },
+      "priority": 0,
+      "isVisible": true,
+      "isSticky": false,
+      "loadPolicy": "LAZY",
+      "cachePolicy": "MEMORY",
+      "exposureConfig": null
+    },
+    {
+      "floorId": "demo_text_floor",
+      "floorType": "text",
+      "floorConfig": {
+        "margin": {
+          "left": 16,
+          "top": 8,
+          "right": 16,
+          "bottom": 8
+        },
+        "padding": {
+          "left": 16,
+          "top": 16,
+          "right": 16,
+          "bottom": 16
+        },
+        "cornerRadius": 16.0,
+        "backgroundColor": "#FFFFFF",
+        "elevation": 2.0,
+        "clickable": true,
+        "jumpAction": null,
+        "customStyle": {}
+      },
+      "businessData": {
+        "title": "文本楼层示例",
+        "content": "这是一个文本楼层的示例，展示如何在楼层中显示文字内容。支持多种样式配置，包括字体大小、颜色、背景等。",
+        "title_color": "#2E7D32",
+        "content_color": "#424242",
+        "title_size": 16.0,
+        "content_size": 14.0
+      },
+      "priority": 0,
+      "isVisible": true,
+      "isSticky": false,
+      "loadPolicy": "LAZY",
+      "cachePolicy": "MEMORY",
+      "exposureConfig": null
+    },
+    {
+      "floorId": "demo_image_floor",
+      "floorType": "image",
+      "floorConfig": {
+        "margin": {
+          "left": 16,
+          "top": 8,
+          "right": 16,
+          "bottom": 8
+        },
+        "padding": {
+          "left": 12,
+          "top": 12,
+          "right": 12,
+          "bottom": 12
+        },
+        "cornerRadius": 16.0,
+        "backgroundColor": "#FFFFFF",
+        "elevation": 2.0,
+        "clickable": true,
+        "jumpAction": null,
+        "customStyle": {}
+      },
+      "businessData": {
+        "title": "图片楼层示例",
+        "description": "这是一个图片楼层的示例，可以展示各种图片内容。",
+        "image_url": "https://popaife.s3-accelerate.amazonaws.com/other/talkingLime-2025-07-01-01.webp",
+        "scale_type": "CENTER_CROP",
+        "title_color": "#1976D2",
+        "description_color": "#666666"
+      },
+      "priority": 0,
+      "isVisible": true,
+      "isSticky": false,
+      "loadPolicy": "LAZY",
+      "cachePolicy": "MEMORY",
+      "exposureConfig": null
+    }
+  ]
+} 

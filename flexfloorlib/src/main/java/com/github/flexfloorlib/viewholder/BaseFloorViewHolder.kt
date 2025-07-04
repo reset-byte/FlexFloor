@@ -7,7 +7,7 @@ import com.github.flexfloorlib.model.FloorData
 import com.github.flexfloorlib.observer.FloorExposureObserver
 
 /**
- * Base ViewHolder for floor items
+ * 楼层项目的基础ViewHolder
  */
 abstract class BaseFloorViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
     
@@ -16,7 +16,7 @@ abstract class BaseFloorViewHolder(itemView: View) : RecyclerView.ViewHolder(ite
     private var exposureObserver: FloorExposureObserver? = null
     
     /**
-     * Bind floor data to view
+     * 绑定楼层数据到视图
      */
     fun bindFloor(floorData: FloorData, floor: BaseFloor<*>?, position: Int) {
         this.floorData = floorData
@@ -36,7 +36,7 @@ abstract class BaseFloorViewHolder(itemView: View) : RecyclerView.ViewHolder(ite
     }
     
     /**
-     * Apply floor configuration (styling, margins, etc.)
+     * 应用楼层配置（样式、边距等）
      */
     private fun applyFloorConfig(floorData: FloorData) {
         val config = floorData.floorConfig
@@ -81,7 +81,7 @@ abstract class BaseFloorViewHolder(itemView: View) : RecyclerView.ViewHolder(ite
     }
     
     /**
-     * Apply background color and corner radius using GradientDrawable
+     * 使用GradientDrawable应用背景色和圆角半径
      */
     private fun applyBackgroundWithCornerRadius(config: com.github.flexfloorlib.model.FloorConfig) {
         if (config.cornerRadius > 0 || config.backgroundColor != null) {
@@ -108,14 +108,14 @@ abstract class BaseFloorViewHolder(itemView: View) : RecyclerView.ViewHolder(ite
     }
     
     /**
-     * Convert dp to px
+     * 将dp转换为px
      */
     private fun convertDpToPx(dp: Float, context: android.content.Context): Float {
         return dp * context.resources.displayMetrics.density
     }
     
     /**
-     * Setup click listener for floor
+     * 设置楼层点击监听器
      */
     private fun setupClickListener() {
         if (floorData?.floorConfig?.clickable == true) {
@@ -130,7 +130,7 @@ abstract class BaseFloorViewHolder(itemView: View) : RecyclerView.ViewHolder(ite
     }
     
     /**
-     * Setup exposure tracking
+     * 设置曝光追踪
      */
     private fun setupExposureTracking() {
         floorData?.exposureConfig?.let { exposureConfig ->
@@ -146,21 +146,21 @@ abstract class BaseFloorViewHolder(itemView: View) : RecyclerView.ViewHolder(ite
     }
     
     /**
-     * Called when floor is clicked
+     * 楼层被点击时调用
      */
     protected open fun onFloorClicked(view: View) {
-        // Override in subclasses if needed
+        // 子类可以重写此方法
     }
     
     /**
-     * Called when floor is exposed
+     * 楼层被曝光时调用
      */
     protected open fun onFloorExposed(floorId: String, exposureData: Map<String, Any>) {
-        // Override in subclasses if needed
+        // 子类可以重写此方法
     }
     
     /**
-     * Called when ViewHolder is recycled
+     * ViewHolder被回收时调用
      */
     open fun onViewRecycled() {
         exposureObserver?.stopTracking()
@@ -168,7 +168,7 @@ abstract class BaseFloorViewHolder(itemView: View) : RecyclerView.ViewHolder(ite
     }
     
     /**
-     * Called when ViewHolder is attached to window
+     * ViewHolder被附加到窗口时调用
      */
     open fun onViewAttachedToWindow() {
         exposureObserver?.startTracking()
@@ -176,7 +176,7 @@ abstract class BaseFloorViewHolder(itemView: View) : RecyclerView.ViewHolder(ite
     }
     
     /**
-     * Called when ViewHolder is detached from window
+     * ViewHolder从窗口分离时调用
      */
     open fun onViewDetachedFromWindow() {
         exposureObserver?.stopTracking()

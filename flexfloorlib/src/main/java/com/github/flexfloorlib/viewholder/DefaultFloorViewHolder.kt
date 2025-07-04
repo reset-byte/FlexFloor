@@ -3,7 +3,7 @@ package com.github.flexfloorlib.viewholder
 import android.view.View
 
 /**
- * Default ViewHolder for unknown or fallback floor types
+ * 用于未知或回退楼层类型的默认ViewHolder
  */
 class DefaultFloorViewHolder(itemView: View) : BaseFloorViewHolder(itemView) {
     
