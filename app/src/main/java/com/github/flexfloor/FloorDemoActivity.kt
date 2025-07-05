@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.lifecycle.ViewModelProvider
 import com.github.flexfloor.databinding.ActivityFloorDemoBinding
 import com.github.flexfloor.floors.BannerFloor
 import com.github.flexfloor.floors.ImageFloor
@@ -13,105 +12,122 @@ import com.github.flexfloor.network.MockFloorDataSource
 import com.github.flexfloorlib.core.FloorManager
 import com.github.flexfloorlib.core.FloorFactory
 import com.github.flexfloorlib.core.FloorViewModel
+import com.github.flexfloorlib.core.FloorArchitecture
 import com.github.flexfloorlib.model.FloorType
 import com.github.flexfloorlib.model.FloorData
 import com.github.flexfloorlib.model.FloorConfig
 import com.github.flexfloorlib.model.EdgeInsets
 
 /**
- * 楼层化框架演示页面 - 使用 MVVM 架构
+ * 楼层化框架演示页面 - 使用改进的架构设计
+ * 
+ * 架构特点：
+ * 1. 数据源在应用层管理
+ * 2. 通过依赖注入配置Repository
+ * 3. FloorManager专注于楼层展示
+ * 4. 清晰的职责分离
  */
 class FloorDemoActivity : ComponentActivity() {
 
     private lateinit var binding: ActivityFloorDemoBinding
     private lateinit var floorManager: FloorManager
     private lateinit var viewModel: FloorViewModel
-    private lateinit var mockDataSource: MockFloorDataSource
+    private lateinit var dataSource: MockFloorDataSource
 
-    /**
-     * 初始化活动并设置楼层演示
-     * 设置视图绑定、注册楼层类型、初始化楼层管理器、配置UI组件和加载演示楼层
-     *
-     * @param savedInstanceState 保存的实例状态包
-     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        
         binding = ActivityFloorDemoBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        initViewModel()
+        
+        // 初始化架构组件
+        initializeArchitecture()
+        
+        // 注册楼层类型
         registerFloorTypes()
+        
+        // 初始化FloorManager
         initFloorManager()
+        
+        // 设置UI
         setupUI()
+        
+        // 观察数据变化
         observeViewModel()
+        
+        // 加载演示数据
         loadDemoFloors()
     }
-
+    
     /**
-     * 初始化 ViewModel 和数据源
+     * 初始化架构组件
+     * 使用依赖注入的方式配置数据源和Repository
      */
-    private fun initViewModel() {
-        // 创建 ViewModel
-        viewModel = ViewModelProvider(this)[FloorViewModel::class.java]
+    private fun initializeArchitecture() {
+        // 1. 创建你的数据源实现（这里用户可以实现自己的网络请求）
+        dataSource = MockFloorDataSource(this)
         
-        // 创建模拟数据源
-        mockDataSource = MockFloorDataSource(this)
-        
-        // 设置数据源到 ViewModel
-        viewModel.setRemoteDataSource(mockDataSource)
+        // 2. 使用架构初始化器创建ViewModel（推荐方式）
+        viewModel = FloorArchitecture.createViewModel(application, dataSource)
     }
-
+    
     /**
-     * 向FloorFactory注册所有可用的楼层类型
-     * 将楼层类型映射到对应的楼层实现类
+     * 注册楼层类型
      */
     private fun registerFloorTypes() {
         FloorFactory.registerFloor(FloorType.TEXT) { TextFloor() }
         FloorFactory.registerFloor(FloorType.IMAGE) { ImageFloor() }
         FloorFactory.registerFloor(FloorType.BANNER) { BannerFloor() }
     }
-
+    
     /**
-     * 初始化和配置FloorManager
-     * 设置RecyclerView集成、启用预加载和吸顶楼层功能、配置点击和曝光监听器
+     * 初始化FloorManager
+     * 专注于楼层展示配置，不涉及数据源
      */
     private fun initFloorManager() {
         floorManager = FloorManager.create(this)
             .setupWithRecyclerView(binding.recyclerView)
             .enablePreloading(true, 5)
             .enableStickyFloors(true)
-            .enableAutoErrorHandling(true) // 启用自动错误处理
+            .enableAutoErrorHandling(true)
             .setOnFloorClickListener { floorData, position ->
-                // 通过 ViewModel 处理楼层点击事件
                 viewModel.onFloorClicked(floorData, position)
             }
             .setOnFloorExposureListener { floorId, exposureData ->
-                // 通过 ViewModel 处理楼层曝光统计
                 viewModel.onFloorExposed(floorId, exposureData)
             }
-            // 不需要设置错误监听器，SDK会自动处理
+            .configureErrorHandling {
+                // 配置错误处理策略
+                onNetworkError(
+                    com.github.flexfloorlib.core.ErrorHandlingStrategy.RETRY,
+                    com.github.flexfloorlib.core.ErrorRecoveryAction.Retry(maxRetries = 3)
+                )
+                onDataParseError(
+                    com.github.flexfloorlib.core.ErrorHandlingStrategy.FALLBACK,
+                    com.github.flexfloorlib.core.ErrorRecoveryAction.Fallback {
+                        Toast.makeText(this@FloorDemoActivity, "数据解析失败，使用缓存数据", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
     }
-
+    
     /**
-     * 配置UI组件并设置事件监听器
-     * 设置下拉刷新布局、悬浮操作按钮和其他UI交互
+     * 设置UI组件
      */
     private fun setupUI() {
         binding.swipeRefreshLayout.setOnRefreshListener {
             refreshFloors()
         }
-
+        
         binding.fab.setOnClickListener {
             addTestFloor()
         }
     }
-
+    
     /**
-     * 观察 ViewModel 数据变化
+     * 观察ViewModel数据变化
      */
     private fun observeViewModel() {
-        // 观察楼层数据列表
         viewModel.floorDataList.observe(this) { floorList ->
             if (floorList.isNotEmpty()) {
                 floorManager.loadFloors(floorList)
@@ -122,50 +138,47 @@ class FloorDemoActivity : ComponentActivity() {
                 binding.emptyStateLayout.visibility = View.VISIBLE
             }
         }
-
-        // 观察加载状态
+        
         viewModel.isLoading.observe(this) { isLoading ->
             binding.progressIndicator.visibility = if (isLoading) View.VISIBLE else View.GONE
             binding.swipeRefreshLayout.isRefreshing = isLoading
         }
-
-        // 观察错误状态 - 简化处理
+        
         viewModel.error.observe(this) { error ->
             if (error.isNotEmpty()) {
-                // 只显示简单的提示，不需要复杂的错误处理
                 Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
             }
         }
-
-        // 观察楼层点击事件
+        
         viewModel.floorClickEvent.observe(this) { (floorData, position) ->
-            Toast.makeText(this, "${floorData.floorType.typeName}楼层点击位置$position", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                "点击了${floorData.floorType.typeName}楼层，位置：$position",
+                Toast.LENGTH_SHORT
+            ).show()
         }
-
-        // 观察楼层曝光事件
+        
         viewModel.floorExposureEvent.observe(this) { (floorId, _) ->
-            Toast.makeText(this, "${floorId}楼层曝光", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "楼层曝光：$floorId", Toast.LENGTH_SHORT).show()
         }
     }
-
+    
     /**
-     * 加载演示楼层到RecyclerView
-     * 通过 ViewModel 从数据源中加载楼层数据
+     * 加载演示楼层数据
      */
     private fun loadDemoFloors() {
         viewModel.loadFloorConfig("demo_page", useCache = false)
     }
-
+    
     /**
      * 刷新楼层数据
      */
     private fun refreshFloors() {
         viewModel.refreshFloorConfig("demo_page")
     }
-
+    
     /**
-     * 动态添加测试楼层到RecyclerView
-     * 创建具有唯一ID的新文本楼层并将其添加到楼层管理器
+     * 动态添加测试楼层
      */
     private fun addTestFloor() {
         val testFloor = FloorData(
@@ -186,8 +199,7 @@ class FloorDemoActivity : ComponentActivity() {
                 "content_color" to "#424242"
             )
         )
-
-        // 通过 ViewModel 添加楼层
+        
         viewModel.addFloor(testFloor)
     }
 } 

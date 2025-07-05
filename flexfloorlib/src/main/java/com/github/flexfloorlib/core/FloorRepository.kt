@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * 楼层数据管理仓库
- * 协调网络、缓存和本地数据源之间的交互
+ * 协调网络、缓存数据源之间的交互
  */
 class FloorRepository private constructor(context: Context) {
     
@@ -26,9 +26,8 @@ class FloorRepository private constructor(context: Context) {
     
     private val cacheManager = FloorCacheManager.getInstance(context)
     
-    // 数据源接口（由应用程序实现）
+    // 远程数据源接口（由应用程序实现）
     private var remoteDataSource: FloorRemoteDataSource? = null
-    private var localDataSource: FloorLocalDataSource? = null
     
     /**
      * 设置远程数据源
@@ -38,14 +37,7 @@ class FloorRepository private constructor(context: Context) {
     }
     
     /**
-     * 设置本地数据源
-     */
-    fun setLocalDataSource(dataSource: FloorLocalDataSource) {
-        this.localDataSource = dataSource
-    }
-    
-    /**
-     * 从各种数据源加载楼层配置
+     * 从远程数据源加载楼层配置
      */
     suspend fun loadFloorConfig(pageId: String, useCache: Boolean = true): List<FloorData> {
         return withContext(Dispatchers.IO) {
@@ -66,8 +58,8 @@ class FloorRepository private constructor(context: Context) {
                     return@withContext remoteConfig
                 }
                 
-                // 回退到本地数据源
-                localDataSource?.loadFloorConfig(pageId) ?: emptyList()
+                // 如果远程数据源也没有数据，返回空列表
+                emptyList()
                 
             } catch (e: Exception) {
                 // 出错时回退到缓存数据
@@ -97,8 +89,8 @@ class FloorRepository private constructor(context: Context) {
                     return@withContext remoteData
                 }
                 
-                // 回退到本地
-                localDataSource?.loadFloorData(floorId, floorType, params)
+                // 如果远程数据源也没有数据，返回null
+                null
                 
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -162,13 +154,4 @@ interface FloorRemoteDataSource {
     suspend fun loadFloorConfig(pageId: String): List<FloorData>?
     suspend fun loadFloorData(floorId: String, floorType: String, params: Map<String, Any>): Any?
     suspend fun updateFloorConfig(pageId: String, floorConfig: List<FloorData>): Boolean
-}
-
-/**
- * 本地楼层数据源接口
- */
-interface FloorLocalDataSource {
-    suspend fun loadFloorConfig(pageId: String): List<FloorData>?
-    suspend fun loadFloorData(floorId: String, floorType: String, params: Map<String, Any>): Any?
-    suspend fun saveFloorConfig(pageId: String, floorConfig: List<FloorData>): Boolean
 } 

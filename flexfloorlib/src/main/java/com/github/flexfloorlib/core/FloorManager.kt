@@ -464,6 +464,14 @@ class FloorManager private constructor(
         return this
     }
     
+    /**
+     * 设置错误处理策略
+     */
+    fun setErrorHandlingStrategy(errorCode: String, strategy: ErrorHandlingStrategy): FloorManager {
+        errorHandler.setErrorStrategy(errorCode, strategy)
+        return this
+    }
+    
     // === 错误处理辅助方法 ===
     
     /**

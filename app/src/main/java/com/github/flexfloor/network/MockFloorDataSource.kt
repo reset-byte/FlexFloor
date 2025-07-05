@@ -14,10 +14,10 @@ import java.io.InputStream
  * 从assets文件夹中读取JSON数据，模拟网络请求的行为
  */
 class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource {
-    
+
     private val gson = Gson()
-    private val networkDelayMs = 500L // 模拟网络延迟500ms
-    
+    private val networkDelayMs = 5000L // 模拟网络延迟5000ms
+
     /**
      * 模拟加载楼层配置
      * @param pageId 页面ID
@@ -27,29 +27,29 @@ class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource 
         return try {
             // 模拟网络延迟
             delay(networkDelayMs)
-            
+
             // 从assets中读取JSON数据
             val jsonString = readJsonFromAssets("floor_demo_data.json")
-            
+
             // 解析JSON数据
-            val floorConfigResponse = gson.fromJson<FloorConfigResponse>(
+            val floorConfigResponse = gson.fromJson(
                 jsonString,
                 FloorConfigResponse::class.java
             )
-            
+
             // 转换为业务实体对象
             if (floorConfigResponse.success && floorConfigResponse.data != null) {
                 FloorDataMapper.fromDtoList(floorConfigResponse.data)
             } else {
                 emptyList()
             }
-            
+
         } catch (e: Exception) {
             e.printStackTrace()
             null
         }
     }
-    
+
     /**
      * 模拟加载楼层业务数据
      * @param floorId 楼层ID
@@ -65,7 +65,7 @@ class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource 
         return try {
             // 模拟网络延迟
             delay(networkDelayMs)
-            
+
             // 这里可以根据楼层ID和类型返回不同的数据
             // 暂时返回一个示例数据
             when (floorType) {
@@ -74,13 +74,13 @@ class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource 
                 "image" -> getImageData()
                 else -> null
             }
-            
+
         } catch (e: Exception) {
             e.printStackTrace()
             null
         }
     }
-    
+
     /**
      * 模拟更新楼层配置
      * @param pageId 页面ID
@@ -94,7 +94,7 @@ class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource 
         return try {
             // 模拟网络延迟
             delay(networkDelayMs)
-            
+
             // 模拟更新成功
             true
         } catch (e: Exception) {
@@ -102,7 +102,7 @@ class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource 
             false
         }
     }
-    
+
     /**
      * 从assets文件夹中读取JSON文件
      */
@@ -119,7 +119,7 @@ class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource 
             ""
         }
     }
-    
+
     /**
      * 获取Banner数据
      */
@@ -133,14 +133,14 @@ class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource 
                     "background_color" to "#FF5722"
                 ),
                 mapOf(
-                    "title" to "动态内容 2", 
+                    "title" to "动态内容 2",
                     "description" to "这是动态加载的第二个页面",
                     "background_color" to "#9E9E9E"
                 )
             )
         )
     }
-    
+
     /**
      * 获取Text数据
      */
@@ -152,7 +152,7 @@ class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource 
             "content_color" to "#757575"
         )
     }
-    
+
     /**
      * 获取Image数据
      */

@@ -1,90 +1,137 @@
-# FlexFloor - Android 楼层化页面架构
+# FlexFloor
 
-FlexFloor 是一个高性能的 Android 楼层化页面架构解决方案，灵感来源于京东商城的楼层化设计。它提供了模块化、动态配置、强解耦的 UI 架构，特别适用于电商首页、频道页等复杂页面场景。
+一个灵活的 Android 楼层化框架，采用 MVVM 架构，支持动态配置、缓存管理、错误处理和多种楼层类型。
 
 ## 核心特性
 
-### 🏗️ 架构特性
-- **Kotlin + MVVM + 协程** - 现代化的技术栈
-- **模块化设计** - 每个楼层都是独立的模块
-- **动态配置** - 支持服务端配置楼层样式和内容
-- **强解耦** - 楼层间无依赖，便于开发和维护
-
-### ⚡ 性能优化
-- **楼层复用** - 基于 RecyclerView 的高效视图复用
-- **数据缓存** - 多级缓存策略（内存+磁盘）
-- **懒加载** - 非可见楼层延迟加载数据
-- **差异更新** - DiffUtil 智能更新变化的楼层
-- **预加载** - 智能预加载即将显示的楼层
-- **楼层池** - 维护常用楼层类型的视图池
-
-### 🔧 功能特性
-- **骨架屏支持** - 优雅的加载状态展示
-- **局部刷新** - 支持单个楼层的独立刷新
-- **Sticky 吸顶** - 楼层吸顶功能
-- **配置缓存** - 楼层配置的缓存和预加载
-- **埋点监听** - 楼层曝光和点击事件监听
+- **楼层化架构**：基于楼层概念的页面组织方式
+- **MVVM 架构**：清晰的数据流和状态管理
+- **动态配置**：支持运行时添加、删除、更新楼层
+- **智能缓存**：多级缓存策略，提升性能
+- **错误处理**：完善的错误处理和恢复机制
+- **多种楼层类型**：文本、图片、轮播等内置楼层类型
+- **易于扩展**：简单的楼层注册和自定义机制
+- **依赖注入**：支持自定义数据源的灵活注入
 
 ## 快速开始
 
-### 1. 添加依赖
+### 1. 实现数据源
+
+首先，用户需要实现自己的数据源，可以使用 Retrofit、OkHttp 等网络框架：
 
 ```kotlin
-dependencies {
-    implementation 'com.github.flexfloorlib:flexfloorlib:1.0.0'
+class YourFloorDataSource(
+    private val apiService: YourApiService,
+    private val authManager: AuthManager
+) : FloorRemoteDataSource {
+    
+    override suspend fun loadFloorConfig(pageId: String): List<FloorData>? {
+        return try {
+            // 使用你的网络框架实现
+            val response = apiService.getFloorConfig(
+                pageId = pageId,
+                token = authManager.getToken()
+            )
+            
+            if (response.isSuccessful) {
+                // 转换为 FloorData 格式
+                convertToFloorData(response.body())
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            // 处理网络异常
+            null
+        }
+    }
+    
+    override suspend fun loadFloorData(
+        floorId: String, 
+        floorType: String, 
+        params: Map<String, Any>
+    ): Any? {
+        return try {
+            val response = apiService.getFloorBusinessData(
+                floorId = floorId,
+                params = params,
+                token = authManager.getToken()
+            )
+            response.body()
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    override suspend fun updateFloorConfig(
+        pageId: String, 
+        floorConfig: List<FloorData>
+    ): Boolean {
+        return try {
+            val response = apiService.updateFloorConfig(pageId, floorConfig)
+            response.isSuccessful
+        } catch (e: Exception) {
+            false
+        }
+    }
 }
 ```
 
-### 2. 注册楼层类型
+### 2. 在Activity中使用
 
 ```kotlin
-// 注册内置楼层类型
-FlexFloor.registerFloor(FloorType.BANNER) { BannerFloor() }
-FlexFloor.registerFloor(FloorType.GRID) { GridFloor() }
-FlexFloor.registerFloor(FloorType.LIST_HORIZONTAL) { HorizontalListFloor() }
-
-// 注册自定义楼层类型
-FlexFloor.registerCustomFloor("product_recommendation") { ProductRecommendationFloor() }
-```
-
-### 3. 在 Activity/Fragment 中使用
-
-```kotlin
-class MainActivity : AppCompatActivity() {
+class YourActivity : ComponentActivity() {
     
     private lateinit var floorManager: FloorManager
     private lateinit var viewModel: FloorViewModel
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
         
-        // 初始化 ViewModel
-        viewModel = ViewModelProvider(this)[FloorViewModel::class.java]
+        // 1. 创建你的数据源（在应用层管理）
+        val dataSource = YourFloorDataSource(
+            apiService = RetrofitClient.apiService,
+            authManager = AuthManager.getInstance()
+        )
         
-        // 设置数据源
-        viewModel.setRemoteDataSource(MyRemoteDataSource())
-        viewModel.setLocalDataSource(MyLocalDataSource())
+        // 2. 使用依赖注入创建 ViewModel（推荐方式）
+        viewModel = FloorArchitecture.createViewModel(application, dataSource)
         
-        // 初始化楼层管理器
-        floorManager = FlexFloor.with(this, this)
-            .enablePreloading(true, 3)
+        // 3. 注册楼层类型
+        FloorFactory.registerFloor(FloorType.TEXT) { TextFloor() }
+        FloorFactory.registerFloor(FloorType.IMAGE) { ImageFloor() }
+        FloorFactory.registerFloor(FloorType.BANNER) { BannerFloor() }
+        
+        // 4. 配置 FloorManager（专注于楼层展示）
+        floorManager = FloorManager.create(this)
+            .setupWithRecyclerView(recyclerView)
+            .enablePreloading(true, 5)
             .enableStickyFloors(true)
-            .setupWith(recyclerView)
+            .enableAutoErrorHandling(true)
             .setOnFloorClickListener { floorData, position ->
-                // 处理楼层点击
                 viewModel.onFloorClicked(floorData, position)
             }
             .setOnFloorExposureListener { floorId, exposureData ->
-                // 处理楼层曝光
                 viewModel.onFloorExposed(floorId, exposureData)
             }
+            .configureErrorHandling {
+                // 配置错误处理策略
+                onNetworkError(
+                    ErrorHandlingStrategy.RETRY,
+                    ErrorRecoveryAction.Retry(maxRetries = 3)
+                )
+                onDataParseError(
+                    ErrorHandlingStrategy.FALLBACK,
+                    ErrorRecoveryAction.Fallback {
+                        showToast("数据解析失败，使用缓存数据")
+                    }
+                )
+            }
         
-        // 观察数据变化
+        // 5. 观察数据变化
         observeViewModel()
         
-        // 加载楼层配置
-        viewModel.loadFloorConfig("home_page")
+        // 6. 加载楼层数据
+        viewModel.loadFloorConfig("your_page_id")
     }
     
     private fun observeViewModel() {
@@ -93,250 +140,225 @@ class MainActivity : AppCompatActivity() {
         }
         
         viewModel.isLoading.observe(this) { isLoading ->
-            // 显示/隐藏加载状态
+            // 处理加载状态
         }
         
         viewModel.error.observe(this) { error ->
-            if (error.isNotEmpty()) {
-                // 显示错误信息
-            }
+            // 处理错误
         }
     }
 }
 ```
 
-### 4. 创建自定义楼层
+### 3. 可选的使用方式
+
+#### 使用 ViewModelProvider 和 Factory
 
 ```kotlin
-class BannerFloor : BaseFloor<BannerData>() {
-    
-    override fun getLayoutResId(): Int = R.layout.floor_banner
-    
-    override fun getFloorType(): String = FloorType.BANNER.typeName
-    
-    override fun bindView(view: View, position: Int) {
-        val bannerView = view.findViewById<BannerView>(R.id.banner_view)
-        businessData?.let { data ->
-            bannerView.setData(data.bannerList)
-        }
-    }
-    
-    override suspend fun loadData(): BannerData? {
-        return withContext(Dispatchers.IO) {
-            // 从网络或缓存加载数据
-            api.loadBannerData(floorData?.floorId ?: "")
-        }
-    }
-    
-    override fun onFloorVisible() {
-        super.onFloorVisible()
-        // 楼层可见时的处理
-    }
-    
-    override fun onFloorInvisible() {
-        super.onFloorInvisible()
-        // 楼层不可见时的处理
-    }
-}
-
-data class BannerData(
-    val bannerList: List<BannerItem>
-)
+// 如果你习惯使用传统的 ViewModelProvider
+val factory = FloorArchitecture.createViewModelFactory(application, dataSource)
+viewModel = ViewModelProvider(this, factory)[FloorViewModel::class.java]
 ```
 
-### 5. 配置楼层数据
+#### 使用仓库构建器
 
 ```kotlin
-val floorDataList = listOf(
-    FloorData(
-        floorId = "banner_001",
-        floorType = FloorType.BANNER,
-        floorConfig = FloorConfig(
-            margin = EdgeInsets(16, 16, 16, 8),
-            cornerRadius = 12f,
-            backgroundColor = "#FFFFFF",
-            clickable = true,
-            jumpAction = JumpAction(
-                actionType = ActionType.WEB,
-                url = "https://example.com"
-            )
-        ),
-        businessData = mapOf("banner_id" to "001"),
-        isSticky = false,
-        loadPolicy = LoadPolicy.EAGER,
-        cachePolicy = CachePolicy.BOTH,
-        exposureConfig = ExposureConfig(
-            trackOnShow = true,
-            minVisibleRatio = 0.5f,
-            minVisibleDuration = 500L
-        )
-    ),
-    // 更多楼层...
-)
+// 如果需要更复杂的配置
+val repository = FloorRepositoryBuilder(application)
+    .setRemoteDataSource(dataSource)
+    .build()
+
+val factory = FloorViewModelFactory(application, repository)
+viewModel = ViewModelProvider(this, factory)[FloorViewModel::class.java]
 ```
 
 ## 架构设计
 
-### 核心组件
+### 为什么这样设计？
+
+1. **数据源在应用层管理**：
+   - 用户可以使用任何网络框架（Retrofit、OkHttp、Volley等）
+   - 方便处理认证、头部信息、错误重试等业务逻辑
+   - 支持复杂的网络配置和拦截器
+
+2. **依赖注入模式**：
+   - 明确的依赖关系，便于测试
+   - 支持模拟数据源进行单元测试
+   - 符合 SOLID 原则
+
+3. **职责分离清晰**：
+   - `FloorManager`: 专注于楼层展示和交互
+   - `FloorViewModel`: 专注于数据状态管理
+   - `FloorRepository`: 负责数据获取和缓存
+   - `DataSource`: 负责具体的网络实现
+
+### 架构优势
+
+| 组件 | 职责 | 优势 |
+|------|------|------|
+| **YourDataSource** | 网络请求实现 | 用户完全控制，支持任何网络框架 |
+| **FloorArchitecture** | 依赖注入配置 | 简化初始化，明确依赖关系 |
+| **FloorViewModel** | 数据状态管理 | 标准 MVVM，易于测试 |
+| **FloorManager** | 楼层展示管理 | 专注UI，链式配置 |
+
+### 数据流向
 
 ```
-FlexFloor (入口)
-├── FloorManager (核心管理器)
-├── FloorAdapter (RecyclerView适配器)
-├── BaseFloor (楼层基类)
-├── FloorFactory (楼层工厂)
-├── FloorCacheManager (缓存管理)
-├── FloorPreloader (预加载器)
-├── StickyFloorHelper (吸顶助手)
-├── FloorExposureObserver (曝光监听)
-└── FloorViewModel (MVVM ViewModel)
+YourActivity
+    ↓ 创建
+YourDataSource (用户实现)
+    ↓ 注入
+FloorRepository
+    ↓ 注入
+FloorViewModel
+    ↓ 数据流
+FloorManager → RecyclerView
 ```
 
-### 数据流
+## 实战示例
 
-```
-Remote/Local DataSource
-        ↓
-FloorRepository (缓存策略)
-        ↓
-FloorViewModel (MVVM)
-        ↓
-FloorManager (协调器)
-        ↓
-FloorAdapter (UI渲染)
-        ↓
-BaseFloor (具体楼层)
-```
-
-## 高级特性
-
-### 缓存策略
-
-FlexFloor 提供了灵活的缓存策略：
+### 使用 Retrofit 的完整示例
 
 ```kotlin
-enum class CachePolicy {
-    NONE,       // 不缓存
-    MEMORY,     // 仅内存缓存
-    DISK,       // 仅磁盘缓存
-    BOTH        // 内存+磁盘缓存
+// 1. 定义API接口
+interface FloorApiService {
+    @GET("api/floors/{pageId}")
+    suspend fun getFloorConfig(@Path("pageId") pageId: String): Response<FloorConfigResponse>
+    
+    @POST("api/floors/{floorId}/data")
+    suspend fun getFloorData(@Path("floorId") floorId: String): Response<Any>
+}
+
+// 2. 实现数据源
+class RetrofitFloorDataSource(
+    private val apiService: FloorApiService
+) : FloorRemoteDataSource {
+    
+    override suspend fun loadFloorConfig(pageId: String): List<FloorData>? {
+        return try {
+            val response = apiService.getFloorConfig(pageId)
+            if (response.isSuccessful) {
+                response.body()?.data?.let { FloorDataMapper.fromDtoList(it) }
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    // ... 其他方法实现
+}
+
+// 3. 在Activity中使用
+class MainActivity : ComponentActivity() {
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        val retrofit = Retrofit.Builder()
+            .baseUrl("https://your-api.com/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+        
+        val apiService = retrofit.create(FloorApiService::class.java)
+        val dataSource = RetrofitFloorDataSource(apiService)
+        
+        // 使用架构初始化器
+        val viewModel = FloorArchitecture.createViewModel(application, dataSource)
+        
+        // ... 其余配置
+    }
 }
 ```
 
-### 加载策略
-
-支持多种数据加载策略：
+### 错误处理示例
 
 ```kotlin
-enum class LoadPolicy {
-    EAGER,      // 立即加载
-    LAZY,       // 懒加载（可见时加载）
-    PRELOAD     // 预加载（即将可见时加载）
-}
-```
-
-### 曝光监听
-
-精确的曝光事件监听：
-
-```kotlin
-ExposureConfig(
-    trackOnShow = true,           // 是否监听显示事件
-    trackOnClick = true,          // 是否监听点击事件
-    minVisibleRatio = 0.5f,       // 最小可见比例
-    minVisibleDuration = 500L,    // 最小可见时长
-    eventParams = mapOf(          // 自定义参数
-        "page_name" to "home"
+floorManager.configureErrorHandling {
+    // 网络错误：重试3次
+    onNetworkError(
+        ErrorHandlingStrategy.RETRY,
+        ErrorRecoveryAction.Retry(maxRetries = 3, delayMs = 2000)
     )
-)
+    
+    // 认证错误：跳转登录
+    onErrorCode("AUTH_401", 
+        ErrorHandlingStrategy.NOTIFY_USER,
+        ErrorRecoveryAction.Custom { error ->
+            startActivity(Intent(this@MainActivity, LoginActivity::class.java))
+        }
+    )
+    
+    // 数据解析错误：使用缓存
+    onDataParseError(
+        ErrorHandlingStrategy.FALLBACK,
+        ErrorRecoveryAction.Fallback {
+            loadFromCache()
+        }
+    )
+}
 ```
 
-## 性能优化最佳实践
+## 最佳实践
 
-### 1. 楼层复用优化
+### 1. 数据源设计
+
 ```kotlin
-// 合理设置楼层类型，相同类型的楼层会复用ViewHolder
-override fun getFloorType(): String = "banner_${businessData?.type}"
+// ✅ 推荐：在应用层创建和管理数据源
+class YourDataSource : FloorRemoteDataSource {
+    // 用户完全控制网络实现
+}
+
+// ❌ 不推荐：在框架内部设置数据源
+// floorManager.setRemoteDataSource(dataSource) // 已移除
 ```
 
-### 2. 预加载配置
+### 2. 依赖注入
+
 ```kotlin
-FlexFloor.with(context, lifecycleOwner)
-    .enablePreloading(true, distance = 3) // 预加载距离
+// ✅ 推荐：使用架构初始化器
+val viewModel = FloorArchitecture.createViewModel(application, dataSource)
+
+// ✅ 可选：使用 ViewModelFactory
+val factory = FloorArchitecture.createViewModelFactory(application, dataSource)
+val viewModel = ViewModelProvider(this, factory)[FloorViewModel::class.java]
+
+// ❌ 避免：混合多种方式
 ```
 
-### 3. 缓存配置
+### 3. 错误处理
+
 ```kotlin
-val cacheManager = floorManager.getCacheManager()
-cacheManager.configureCacheSettings(
-    maxMemorySize = 100,        // 内存缓存最大条目数
-    memoryTtlMillis = 30 * 60 * 1000L,  // 内存缓存TTL
-    diskTtlMillis = 24 * 60 * 60 * 1000L // 磁盘缓存TTL
-)
+// ✅ 推荐：配置详细的错误处理策略
+floorManager.configureErrorHandling {
+    onNetworkError(ErrorHandlingStrategy.RETRY, ...)
+    onDataParseError(ErrorHandlingStrategy.FALLBACK, ...)
+}
+
+// ✅ 推荐：启用自动错误处理
+floorManager.enableAutoErrorHandling(true)
 ```
 
-### 4. 差异更新优化
-```kotlin
-// FloorAdapter 会自动使用 DiffUtil 进行差异更新
-floorManager.loadFloors(newFloorList) // 只更新变化的楼层
+## 项目结构
+
 ```
-
-## API 文档
-
-### FlexFloor 主要 API
-
-| 方法 | 说明 |
-|------|------|
-| `FlexFloor.with(context, lifecycle)` | 创建楼层构建器 |
-| `registerFloor(type, creator)` | 注册楼层类型 |
-| `registerCustomFloor(name, creator)` | 注册自定义楼层 |
-
-### FloorManager 主要 API
-
-| 方法 | 说明 |
-|------|------|
-| `loadFloors(floorList)` | 加载楼层列表 |
-| `addFloor(floorData, position)` | 添加单个楼层 |
-| `removeFloor(position)` | 移除楼层 |
-| `updateFloor(position, floorData)` | 更新楼层 |
-| `refreshFloors()` | 刷新所有楼层 |
-
-### BaseFloor 生命周期
-
-| 方法 | 说明 |
-|------|------|
-| `bindView(view, position)` | 绑定视图数据 |
-| `loadData()` | 异步加载业务数据 |
-| `onFloorVisible()` | 楼层变为可见 |
-| `onFloorInvisible()` | 楼层变为不可见 |
-| `onFloorClick(view)` | 楼层被点击 |
-
-## 示例项目
-
-查看 [示例项目](./sample) 了解完整的使用方法。
-
-## 更新日志
-
-### v1.0.0
-- ✅ 基础楼层架构
-- ✅ MVVM + 协程支持
-- ✅ 缓存和预加载
-- ✅ Sticky 吸顶功能
-- ✅ 曝光监听
+FlexFloor/
+├── app/                          # 示例应用
+│   ├── src/main/java/com/github/flexfloor/
+│   │   ├── FloorDemoActivity.kt  # 使用示例
+│   │   ├── floors/               # 楼层实现
+│   │   └── network/              # 数据源实现
+│   └── src/main/assets/          # 示例数据
+└── flexfloorlib/                 # 核心库
+    └── src/main/java/com/github/flexfloorlib/
+        ├── core/                 # 核心组件
+        ├── adapter/              # 适配器
+        ├── cache/                # 缓存管理
+        ├── model/                # 数据模型
+        └── utils/                # 工具类
+```
 
 ## 许可证
 
-```
-Copyright 2024 FlexFloor
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-   http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+MIT License

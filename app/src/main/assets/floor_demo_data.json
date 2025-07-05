@@ -18,7 +18,7 @@
           "bottom": 16
         },
         "cornerRadius": 16.0,
-        "backgroundColor": "#FFFFFF",
+        "backgroundColor": "#E3F2FD",
         "elevation": 2.0,
         "clickable": true,
         "jumpAction": null,
@@ -80,7 +80,7 @@
           "bottom": 16
         },
         "cornerRadius": 16.0,
-        "backgroundColor": "#FFFFFF",
+        "backgroundColor": "#FFF3E0",
         "elevation": 2.0,
         "clickable": true,
         "jumpAction": null,
@@ -118,7 +118,7 @@
           "bottom": 12
         },
         "cornerRadius": 16.0,
-        "backgroundColor": "#FFFFFF",
+        "backgroundColor": "#E8F5E8",
         "elevation": 2.0,
         "clickable": true,
         "jumpAction": null,

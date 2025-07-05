@@ -5,15 +5,18 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.ViewModelProvider
 import com.github.flexfloorlib.model.FloorData
 import kotlinx.coroutines.launch
 
 /**
  * 楼层数据管理的 ViewModel，用于 MVVM 架构
+ * 支持依赖注入和多种创建方式
  */
-class FloorViewModel(application: Application) : AndroidViewModel(application) {
-    
-    private val repository = FloorRepository.getInstance(application)
+class FloorViewModel(
+    application: Application,
+    private val repository: FloorRepository
+) : AndroidViewModel(application) {
     
     // 楼层数据的 LiveData
     private val _floorDataList = MutableLiveData<List<FloorData>>()
@@ -30,6 +33,14 @@ class FloorViewModel(application: Application) : AndroidViewModel(application) {
     
     private val _floorExposureEvent = MutableLiveData<Pair<String, Map<String, Any>>>()
     val floorExposureEvent: LiveData<Pair<String, Map<String, Any>>> = _floorExposureEvent
+    
+    /**
+     * 便利构造函数，使用默认的Repository
+     */
+    constructor(application: Application) : this(
+        application,
+        FloorRepository.getInstance(application)
+    )
     
     /**
      * 加载页面的楼层配置
@@ -156,15 +167,72 @@ class FloorViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+}
+
+/**
+ * FloorViewModel 工厂类，支持依赖注入
+ */
+class FloorViewModelFactory(
+    private val application: Application,
+    private val repository: FloorRepository? = null
+) : ViewModelProvider.Factory {
     
-    /**
-     * 设置数据源
-     */
-    fun setRemoteDataSource(dataSource: FloorRemoteDataSource) {
-        repository.setRemoteDataSource(dataSource)
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(FloorViewModel::class.java)) {
+            val repo = repository ?: FloorRepository.getInstance(application)
+            return FloorViewModel(application, repo) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+}
+
+/**
+ * FloorRepository 构建器，用于配置数据源
+ */
+class FloorRepositoryBuilder(private val application: Application) {
+    private var remoteDataSource: FloorRemoteDataSource? = null
+    
+    fun setRemoteDataSource(dataSource: FloorRemoteDataSource): FloorRepositoryBuilder {
+        this.remoteDataSource = dataSource
+        return this
     }
     
-    fun setLocalDataSource(dataSource: FloorLocalDataSource) {
-        repository.setLocalDataSource(dataSource)
+    fun build(): FloorRepository {
+        val repository = FloorRepository.getInstance(application)
+        remoteDataSource?.let { repository.setRemoteDataSource(it) }
+        return repository
+    }
+}
+
+/**
+ * 楼层架构初始化器
+ */
+object FloorArchitecture {
+    
+    /**
+     * 创建配置了数据源的 FloorViewModel
+     */
+    fun createViewModel(
+        application: Application,
+        remoteDataSource: FloorRemoteDataSource
+    ): FloorViewModel {
+        val repository = FloorRepositoryBuilder(application)
+            .setRemoteDataSource(remoteDataSource)
+            .build()
+        return FloorViewModel(application, repository)
+    }
+    
+    /**
+     * 创建 FloorViewModel 工厂
+     */
+    fun createViewModelFactory(
+        application: Application,
+        remoteDataSource: FloorRemoteDataSource
+    ): FloorViewModelFactory {
+        val repository = FloorRepositoryBuilder(application)
+            .setRemoteDataSource(remoteDataSource)
+            .build()
+        return FloorViewModelFactory(application, repository)
     }
 } 
