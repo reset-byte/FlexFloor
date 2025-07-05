@@ -9,7 +9,7 @@ import com.google.gson.annotations.SerializedName
 
 /**
  * 重构后的文本楼层实现
- * 使用新的架构：职责分离，统一数据处理
+ * 配合两阶段加载：骨架屏 -> 真实数据
  */
 class TextFloor : BaseFloor<TextFloorData>() {
     
@@ -18,15 +18,21 @@ class TextFloor : BaseFloor<TextFloorData>() {
     override fun getLayoutResId(): Int = com.github.flexfloor.R.layout.floor_text
     
     /**
-     * 解析业务数据 - 统一数据解析入口
+     * 解析业务数据
+     * 空数据时返回null以显示骨架屏
      */
     override fun parseBusinessData(configData: Map<String, Any>): TextFloorData? {
+        // 如果没有业务数据，返回null显示骨架屏
+        if (configData.isEmpty()) {
+            return null
+        }
+        
         return try {
             val gson = Gson()
             val json = gson.toJson(configData)
             gson.fromJson(json, TextFloorData::class.java)
         } catch (e: Exception) {
-            // 解析失败时使用默认数据
+            // 解析失败，尝试手动构建
             TextFloorData(
                 title = configData["title"] as? String,
                 content = configData["content"] as? String,
@@ -40,7 +46,7 @@ class TextFloor : BaseFloor<TextFloorData>() {
     }
     
     /**
-     * 渲染视图 - 纯视图渲染逻辑
+     * 渲染视图
      */
     override fun renderView(view: View, data: TextFloorData, position: Int) {
         val titleView: TextView = view.findViewById(com.github.flexfloor.R.id.floor_title_text)
@@ -84,21 +90,32 @@ class TextFloor : BaseFloor<TextFloorData>() {
         titleView.visibility = if (data.title.isNullOrEmpty()) View.GONE else View.VISIBLE
         contentView.visibility = if (data.content.isNullOrEmpty()) View.GONE else View.VISIBLE
         
+        // 重置透明度（清除loading状态的动画效果）
+        titleView.alpha = 1.0f
+        contentView.alpha = 1.0f
+        
+        // 重置文本颜色（清除错误状态）
+        if (data.titleColor == null) {
+            titleView.setTextColor(android.graphics.Color.BLACK)
+        }
+        if (data.contentColor == null) {
+            contentView.setTextColor(android.graphics.Color.GRAY)
+        }
+        
         // 设置点击事件
         view.setOnClickListener { onFloorClick(it) }
     }
     
     /**
-     * 异步加载数据 - 可选的远程数据加载
+     * 异步加载数据
      */
     override suspend fun loadData(): TextFloorData? {
-        // 这里可以实现远程数据加载逻辑
-        // 例如：从API获取更详细的文本内容
-        return null // 当前示例中不需要异步加载
+        // 这里返回null，不会被调用
+        return null
     }
     
     /**
-     * 自定义加载状态显示
+     * 自定义加载状态显示（骨架屏）
      */
     override fun showLoadingState(view: View) {
         val titleView: TextView = view.findViewById(com.github.flexfloor.R.id.floor_title_text)
@@ -108,6 +125,23 @@ class TextFloor : BaseFloor<TextFloorData>() {
         contentView.text = "正在获取内容..."
         titleView.visibility = View.VISIBLE
         contentView.visibility = View.VISIBLE
+        
+        // 添加加载动画效果
+        titleView.alpha = 0.5f
+        contentView.alpha = 0.5f
+        
+        // 创建简单的闪烁动画
+        val animation = android.animation.ObjectAnimator.ofFloat(titleView, "alpha", 0.5f, 1.0f)
+        animation.duration = 500
+        animation.repeatCount = android.animation.ObjectAnimator.INFINITE
+        animation.repeatMode = android.animation.ObjectAnimator.REVERSE
+        animation.start()
+        
+        val contentAnimation = android.animation.ObjectAnimator.ofFloat(contentView, "alpha", 0.5f, 1.0f)
+        contentAnimation.duration = 500
+        contentAnimation.repeatCount = android.animation.ObjectAnimator.INFINITE
+        contentAnimation.repeatMode = android.animation.ObjectAnimator.REVERSE
+        contentAnimation.start()
     }
     
     /**
@@ -121,6 +155,14 @@ class TextFloor : BaseFloor<TextFloorData>() {
         contentView.text = error
         titleView.visibility = View.VISIBLE
         contentView.visibility = View.VISIBLE
+        
+        // 重置透明度
+        titleView.alpha = 1.0f
+        contentView.alpha = 1.0f
+        
+        // 设置错误状态的颜色
+        titleView.setTextColor(android.graphics.Color.RED)
+        contentView.setTextColor(android.graphics.Color.RED)
     }
 }
 

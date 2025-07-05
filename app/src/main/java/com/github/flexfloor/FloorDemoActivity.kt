@@ -15,17 +15,14 @@ import com.github.flexfloorlib.core.FloorViewModel
 import com.github.flexfloorlib.core.FloorArchitecture
 import com.github.flexfloorlib.model.FloorType
 import com.github.flexfloorlib.model.FloorData
-import com.github.flexfloorlib.model.FloorConfig
-import com.github.flexfloorlib.model.EdgeInsets
 
 /**
- * 楼层化框架演示页面 - 使用改进的架构设计
+ * 楼层化框架演示页面 - 正确的加载流程
  * 
- * 架构特点：
- * 1. 数据源在应用层管理
- * 2. 通过依赖注入配置Repository
- * 3. FloorManager专注于楼层展示
- * 4. 清晰的职责分离
+ * 加载流程：
+ * 1. 调用一次loadFloorConfig，立即显示骨架屏
+ * 2. MockFloorDataSource内部延迟5秒
+ * 3. 5秒后通过回调更新真实数据
  */
 class FloorDemoActivity : ComponentActivity() {
 
@@ -55,19 +52,18 @@ class FloorDemoActivity : ComponentActivity() {
         // 观察数据变化
         observeViewModel()
         
-        // 加载演示数据
-        loadDemoFloors()
+        // 设置数据更新回调
+        setupDataUpdateCallback()
+        
+        // 开始加载（一次调用）
+        startLoading()
     }
     
     /**
      * 初始化架构组件
-     * 使用依赖注入的方式配置数据源和Repository
      */
     private fun initializeArchitecture() {
-        // 1. 创建你的数据源实现（这里用户可以实现自己的网络请求）
         dataSource = MockFloorDataSource(this)
-        
-        // 2. 使用架构初始化器创建ViewModel（推荐方式）
         viewModel = FloorArchitecture.createViewModel(application, dataSource)
     }
     
@@ -82,7 +78,6 @@ class FloorDemoActivity : ComponentActivity() {
     
     /**
      * 初始化FloorManager
-     * 专注于楼层展示配置，不涉及数据源
      */
     private fun initFloorManager() {
         floorManager = FloorManager.create(this)
@@ -97,7 +92,6 @@ class FloorDemoActivity : ComponentActivity() {
                 viewModel.onFloorExposed(floorId, exposureData)
             }
             .configureErrorHandling {
-                // 配置错误处理策略
                 onNetworkError(
                     com.github.flexfloorlib.core.ErrorHandlingStrategy.RETRY,
                     com.github.flexfloorlib.core.ErrorRecoveryAction.Retry(maxRetries = 3)
@@ -117,10 +111,6 @@ class FloorDemoActivity : ComponentActivity() {
     private fun setupUI() {
         binding.swipeRefreshLayout.setOnRefreshListener {
             refreshFloors()
-        }
-        
-        binding.fab.setOnClickListener {
-            addTestFloor()
         }
     }
     
@@ -164,9 +154,46 @@ class FloorDemoActivity : ComponentActivity() {
     }
     
     /**
-     * 加载演示楼层数据
+     * 设置数据更新回调
      */
-    private fun loadDemoFloors() {
+    private fun setupDataUpdateCallback() {
+        dataSource.setOnDataUpdateCallback { realData ->
+            runOnUiThread {
+                Toast.makeText(this, "真实数据加载完成，更新楼层内容", Toast.LENGTH_SHORT).show()
+                // 通过ViewModel更新数据，确保正确的数据流
+                updateFloorDataThroughViewModel(realData)
+            }
+        }
+    }
+    
+    /**
+     * 通过ViewModel更新楼层数据
+     */
+    private fun updateFloorDataThroughViewModel(floorData: List<FloorData>) {
+        // 先清除楼层缓存，确保重新创建楼层实例
+        clearFloorCache()
+        
+        // 直接通过FloorManager更新，但要确保清除了缓存
+        floorManager.loadFloors(floorData)
+    }
+    
+    /**
+     * 清除楼层缓存
+     */
+    private fun clearFloorCache() {
+        // 获取FloorAdapter并清除缓存
+        binding.recyclerView.adapter?.let { adapter ->
+            if (adapter is com.github.flexfloorlib.adapter.FloorAdapter) {
+                adapter.clearCache()
+            }
+        }
+    }
+    
+    /**
+     * 开始加载（一次调用）
+     */
+    private fun startLoading() {
+        Toast.makeText(this, "开始加载楼层数据，将显示5秒骨架屏", Toast.LENGTH_SHORT).show()
         viewModel.loadFloorConfig("demo_page", useCache = false)
     }
     
@@ -174,32 +201,13 @@ class FloorDemoActivity : ComponentActivity() {
      * 刷新楼层数据
      */
     private fun refreshFloors() {
-        viewModel.refreshFloorConfig("demo_page")
-    }
-    
-    /**
-     * 动态添加测试楼层
-     */
-    private fun addTestFloor() {
-        val testFloor = FloorData(
-            floorId = "test_floor_${System.currentTimeMillis()}",
-            floorType = FloorType.TEXT,
-            floorConfig = FloorConfig(
-                margin = EdgeInsets(16, 8, 16, 8),
-                padding = EdgeInsets(16, 16, 16, 16),
-                cornerRadius = 8f,
-                backgroundColor = "#FFFFFF",
-                elevation = 2f,
-                clickable = true
-            ),
-            businessData = mapOf(
-                "title" to "动态添加的楼层",
-                "content" to "这是通过FloatingActionButton动态添加的测试楼层",
-                "title_color" to "#2E7D32",
-                "content_color" to "#424242"
-            )
-        )
+        // 重置加载状态
+        dataSource.resetLoadingState()
         
-        viewModel.addFloor(testFloor)
+        // 重新设置回调
+        setupDataUpdateCallback()
+        
+        // 重新开始加载
+        startLoading()
     }
 } 

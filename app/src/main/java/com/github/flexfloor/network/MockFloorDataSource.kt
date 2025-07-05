@@ -5,45 +5,40 @@ import com.github.flexfloor.utils.FloorDataMapper
 import com.github.flexfloorlib.core.FloorRemoteDataSource
 import com.github.flexfloorlib.model.FloorData
 import com.google.gson.Gson
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.IOException
 import java.io.InputStream
 
 /**
  * 模拟楼层数据源
- * 从assets文件夹中读取JSON数据，模拟网络请求的行为
+ * 单次调用，立即返回骨架屏，5秒后通过回调更新真实数据
  */
 class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource {
 
     private val gson = Gson()
     private val networkDelayMs = 5000L // 模拟网络延迟5000ms
+    private val dataSourceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var cachedFullData: List<FloorData>? = null
+    
+    // 数据更新回调
+    private var onDataUpdateCallback: ((List<FloorData>) -> Unit)? = null
 
     /**
-     * 模拟加载楼层配置
-     * @param pageId 页面ID
-     * @return 楼层配置列表
+     * 加载楼层配置 - 立即返回骨架屏，后台加载真实数据
      */
     override suspend fun loadFloorConfig(pageId: String): List<FloorData>? {
         return try {
-            // 模拟网络延迟
-            delay(networkDelayMs)
-
-            // 从assets中读取JSON数据
-            val jsonString = readJsonFromAssets("floor_demo_data.json")
-
-            // 解析JSON数据
-            val floorConfigResponse = gson.fromJson(
-                jsonString,
-                FloorConfigResponse::class.java
-            )
-
-            // 转换为业务实体对象
-            if (floorConfigResponse.success && floorConfigResponse.data != null) {
-                FloorDataMapper.fromDtoList(floorConfigResponse.data)
-            } else {
-                emptyList()
-            }
-
+            // 立即返回骨架屏配置
+            val skeletonConfig = loadSkeletonConfig()
+            
+            // 启动后台任务加载真实数据
+            startBackgroundDataLoading()
+            
+            skeletonConfig
         } catch (e: Exception) {
             e.printStackTrace()
             null
@@ -51,11 +46,64 @@ class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource 
     }
 
     /**
+     * 加载骨架屏配置（立即返回）
+     */
+    private fun loadSkeletonConfig(): List<FloorData> {
+        // 从assets中读取JSON数据
+        val jsonString = readJsonFromAssets("floor_demo_data.json")
+        val floorConfigResponse = gson.fromJson(jsonString, FloorConfigResponse::class.java)
+        
+        if (floorConfigResponse.success && floorConfigResponse.data != null) {
+            val fullData = FloorDataMapper.fromDtoList(floorConfigResponse.data)
+            cachedFullData = fullData // 缓存完整数据
+            
+            // 返回骨架屏配置：清空所有楼层的businessData
+            return fullData.map { floorData ->
+                floorData.copy(businessData = emptyMap())
+            }
+        }
+        
+        return emptyList()
+    }
+
+    /**
+     * 启动后台数据加载任务
+     */
+    private fun startBackgroundDataLoading() {
+        dataSourceScope.launch {
+            try {
+                // 模拟网络延迟
+                delay(networkDelayMs)
+                
+                // 5秒后返回完整数据
+                val realData = cachedFullData ?: emptyList()
+                
+                // 通知数据更新
+                onDataUpdateCallback?.invoke(realData)
+                
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    /**
+     * 设置数据更新回调
+     */
+    fun setOnDataUpdateCallback(callback: (List<FloorData>) -> Unit) {
+        onDataUpdateCallback = callback
+    }
+
+    /**
+     * 重置加载状态（用于刷新）
+     */
+    fun resetLoadingState() {
+        cachedFullData = null
+        onDataUpdateCallback = null
+    }
+
+    /**
      * 模拟加载楼层业务数据
-     * @param floorId 楼层ID
-     * @param floorType 楼层类型
-     * @param params 请求参数
-     * @return 业务数据
      */
     override suspend fun loadFloorData(
         floorId: String,
@@ -63,18 +111,8 @@ class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource 
         params: Map<String, Any>
     ): Any? {
         return try {
-            // 模拟网络延迟
-            delay(networkDelayMs)
-
-            // 这里可以根据楼层ID和类型返回不同的数据
-            // 暂时返回一个示例数据
-            when (floorType) {
-                "banner" -> getBannerData()
-                "text" -> getTextData()
-                "image" -> getImageData()
-                else -> null
-            }
-
+            // 这个方法不再使用，因为数据已经在loadFloorConfig中返回了
+            null
         } catch (e: Exception) {
             e.printStackTrace()
             null
@@ -83,19 +121,13 @@ class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource 
 
     /**
      * 模拟更新楼层配置
-     * @param pageId 页面ID
-     * @param floorConfig 楼层配置
-     * @return 是否更新成功
      */
     override suspend fun updateFloorConfig(
         pageId: String,
         floorConfig: List<FloorData>
     ): Boolean {
         return try {
-            // 模拟网络延迟
             delay(networkDelayMs)
-
-            // 模拟更新成功
             true
         } catch (e: Exception) {
             e.printStackTrace()
@@ -120,49 +152,4 @@ class MockFloorDataSource(private val context: Context) : FloorRemoteDataSource 
         }
     }
 
-    /**
-     * 获取Banner数据
-     */
-    private fun getBannerData(): Map<String, Any> {
-        return mapOf(
-            "title" to "动态Banner标题",
-            "pages" to listOf(
-                mapOf(
-                    "title" to "动态内容 1",
-                    "description" to "这是动态加载的第一个页面",
-                    "background_color" to "#FF5722"
-                ),
-                mapOf(
-                    "title" to "动态内容 2",
-                    "description" to "这是动态加载的第二个页面",
-                    "background_color" to "#9E9E9E"
-                )
-            )
-        )
-    }
-
-    /**
-     * 获取Text数据
-     */
-    private fun getTextData(): Map<String, Any> {
-        return mapOf(
-            "title" to "动态文本标题",
-            "content" to "这是动态加载的文本内容，可以根据用户偏好、时间等因素进行个性化展示。",
-            "title_color" to "#E91E63",
-            "content_color" to "#757575"
-        )
-    }
-
-    /**
-     * 获取Image数据
-     */
-    private fun getImageData(): Map<String, Any> {
-        return mapOf(
-            "title" to "动态图片标题",
-            "description" to "这是动态加载的图片内容描述。",
-            "image_url" to "https://via.placeholder.com/400x200/4CAF50/FFFFFF?text=Dynamic+Image",
-            "title_color" to "#4CAF50",
-            "description_color" to "#616161"
-        )
-    }
 } 

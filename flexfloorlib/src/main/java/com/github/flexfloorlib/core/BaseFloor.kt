@@ -32,6 +32,10 @@ abstract class BaseFloor<T : Any> : LifecycleObserver {
      * 初始化楼层 - 模板方法
      */
     open fun initFloor(floorData: FloorData, businessData: T?) {
+        // 重置状态，确保楼层能够重新初始化
+        dataLoadedFlag = false
+        viewBoundFlag = false
+        
         this.floorData = floorData
         this.businessData = businessData
         
@@ -40,7 +44,11 @@ abstract class BaseFloor<T : Any> : LifecycleObserver {
             this.businessData = parseBusinessData(floorData.businessData)
         }
         
-        markDataLoaded()
+        // 只有当我们有了业务数据才标记为已加载
+        // 如果没有业务数据，说明需要异步加载
+        if (this.businessData != null) {
+            markDataLoaded()
+        }
     }
     
     /**
@@ -58,9 +66,11 @@ abstract class BaseFloor<T : Any> : LifecycleObserver {
             renderView(view, data, position)
             viewBoundFlag = true
         } else {
-            // 无数据则显示加载状态，异步加载
+            // 无数据则显示加载状态，只有在未加载过数据时才异步加载
             showLoadingState(view)
-            loadDataAsync()
+            if (!dataLoadedFlag) {
+                loadDataAsync()
+            }
         }
     }
     
@@ -90,17 +100,19 @@ abstract class BaseFloor<T : Any> : LifecycleObserver {
         floorScope.launch {
             try {
                 val loadedData = loadData()
-                businessData = loadedData
-                markDataLoaded()
                 
                 // 切换到主线程更新视图
                 withContext(Dispatchers.Main) {
                     currentView?.let { view ->
                         if (loadedData != null) {
+                            businessData = loadedData
+                            markDataLoaded()
                             renderView(view, loadedData, currentPosition)
                             viewBoundFlag = true
                         } else {
-                            showErrorState(view, "数据加载失败")
+                            // 如果loadData返回null，不显示错误状态，保持loading状态
+                            // 等待外部数据更新（如通过回调机制）
+                            // showErrorState(view, "数据加载失败")
                         }
                     }
                 }

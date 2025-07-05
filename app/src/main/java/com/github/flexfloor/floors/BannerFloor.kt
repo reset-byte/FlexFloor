@@ -11,8 +11,7 @@ import com.google.gson.annotations.SerializedName
 import com.zhpan.bannerview.BannerViewPager
 
 /**
- * 重构后的横幅楼层实现
- * 使用新的架构：职责分离，统一数据处理
+ * 横幅楼层实现
  */
 class BannerFloor : BaseFloor<BannerFloorData>() {
     
@@ -24,9 +23,15 @@ class BannerFloor : BaseFloor<BannerFloorData>() {
     override fun getLayoutResId(): Int = R.layout.floor_banner
     
     /**
-     * 解析业务数据 - 统一数据解析入口
+     * 解析业务数据
+     * 空数据时返回null以显示骨架屏
      */
     override fun parseBusinessData(configData: Map<String, Any>): BannerFloorData? {
+        // 如果没有业务数据，返回null显示骨架屏
+        if (configData.isEmpty()) {
+            return null
+        }
+        
         return try {
             val gson = Gson()
             val json = gson.toJson(configData)
@@ -138,18 +143,29 @@ class BannerFloor : BaseFloor<BannerFloorData>() {
      * 异步加载数据 - 可选的远程数据加载
      */
     override suspend fun loadData(): BannerFloorData? {
-        // 这里可以实现远程数据加载逻辑
-        // 例如：从API获取更多轮播内容
         return null // 当前示例中不需要异步加载
     }
     
     /**
-     * 自定义加载状态显示
+     * 自定义加载状态显示（骨架屏）
      */
     override fun showLoadingState(view: View) {
         val titleView: TextView = view.findViewById(R.id.banner_title_text)
+        val bannerView: BannerViewPager<*>? = view.findViewById(R.id.banner_view_pager)
+        
         titleView.text = "轮播加载中..."
         titleView.visibility = View.VISIBLE
+        
+        // 隐藏轮播图或显示占位内容
+        bannerView?.visibility = View.VISIBLE
+        
+        // 添加加载动画效果
+        titleView.alpha = 0.5f
+        val animation = android.animation.ObjectAnimator.ofFloat(titleView, "alpha", 0.5f, 1.0f)
+        animation.duration = 500
+        animation.repeatCount = android.animation.ObjectAnimator.INFINITE
+        animation.repeatMode = android.animation.ObjectAnimator.REVERSE
+        animation.start()
     }
     
     /**

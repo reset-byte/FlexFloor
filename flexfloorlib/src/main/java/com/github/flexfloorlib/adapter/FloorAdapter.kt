@@ -84,6 +84,10 @@ class FloorAdapter : RecyclerView.Adapter<BaseFloorViewHolder>() {
      * 使用DiffUtil更新楼层数据
      */
     fun updateFloorData(newFloorDataList: List<FloorData>) {
+        // 清除旧的楼层实例缓存，确保重新创建
+        floorInstanceCache.values.forEach { it.onDestroy() }
+        floorInstanceCache.clear()
+        
         val diffCallback = FloorDiffCallback(floorDataList, newFloorDataList)
         val diffResult = DiffUtil.calculateDiff(diffCallback)
         
@@ -97,8 +101,20 @@ class FloorAdapter : RecyclerView.Adapter<BaseFloorViewHolder>() {
      * 添加单个楼层数据
      */
     fun addFloorData(floorData: FloorData, position: Int = floorDataList.size) {
+        addFloorData(floorData, position, true)
+    }
+    
+    /**
+     * 添加单个楼层数据（支持动画控制）
+     */
+    fun addFloorData(floorData: FloorData, position: Int = floorDataList.size, withAnimation: Boolean = true) {
         floorDataList.add(position, floorData)
-        notifyItemInserted(position)
+        
+        if (withAnimation) {
+            notifyItemInserted(position)
+        } else {
+            notifyDataSetChanged()
+        }
     }
     
     /**

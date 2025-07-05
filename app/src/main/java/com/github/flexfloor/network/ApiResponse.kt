@@ -3,23 +3,6 @@ package com.github.flexfloor.network
 import com.google.gson.annotations.SerializedName
 
 /**
- * API响应的基础数据模型
- */
-data class ApiResponse<T>(
-    @SerializedName("success")
-    val success: Boolean,
-    
-    @SerializedName("data")
-    val data: T?,
-    
-    @SerializedName("message")
-    val message: String? = null,
-    
-    @SerializedName("code")
-    val code: Int = 0
-)
-
-/**
  * 楼层配置响应数据模型
  */
 data class FloorConfigResponse(

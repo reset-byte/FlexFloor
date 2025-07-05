@@ -171,6 +171,13 @@ class FloorManager private constructor(
      * 添加单个楼层
      */
     fun addFloor(floorData: FloorData, position: Int = -1) {
+        addFloor(floorData, position, false)
+    }
+    
+    /**
+     * 添加单个楼层（支持动画控制）
+     */
+    fun addFloor(floorData: FloorData, position: Int = -1, withAnimation: Boolean = false) {
         floorScope.launch {
             executeWithErrorHandling(
                 operation = {
@@ -179,9 +186,10 @@ class FloorManager private constructor(
                     
                     // 添加到适配器
                     if (position >= 0) {
-                        floorAdapter?.addFloorData(floorData, position)
+                        floorAdapter?.addFloorData(floorData, position, withAnimation)
                     } else {
-                        floorAdapter?.addFloorData(floorData)
+                        val currentSize = floorAdapter?.getFloorDataList()?.size ?: 0
+                        floorAdapter?.addFloorData(floorData, currentSize, withAnimation)
                     }
                 },
                 onError = { error ->
